@@ -78,9 +78,8 @@ class node:
         """
         #nominal / discrete type attributes:
         if type(self.data['attributes'][atrID][1]) == list: 
-            Choices = self.data['attributes'][atrID][1]
-            nChoices = len(choices)
-            
+            choices = self.data['attributes'][atrID][1]
+           
             #calculate training instances per choice and positive results per choice
             counts = [] ; positives = []
             for choice in choices:  
@@ -101,7 +100,23 @@ class node:
         
         #numeric type attributes
         if type(self.data['attributes'][atrID][1]) == unicode:
-            pass
+            #calculate training instances on either side of the threashold and positives on either side
+            counts = [0,0]; positives = [0,0]  #[<=, >] 
+            for ID in self.instanceIDs:
+                if self.data['data'][ID][atrID] <= threashold:
+                    counts[0] += 1
+                    if self.data['data'][ID][self.classCol] == data['attributes'][ID][1][0]:
+                         positives[0] += 1
+                else:
+                    counts[1] += 1 
+                    if self.data['data'][ID][self.classCol] == data['attributes'][ID][1][0]:
+                         positives[1] += 1
+            #calculate weighted entropy for numerical attribute on this threashold:
+            wHd = 0
+            for i , condition in enumerate(['belowThreashold','aboveThreashold']):
+                wHd += (counts[i]/self.nInstances) * self.Hd(positives[i],counts[i])
+               
+                    
             
            
     
@@ -167,21 +182,6 @@ class node:
                     candidateSplits.append([candidateSplit , threashold])
         return candidateSplits 
                     
-                    
-                        
-                    
-                    
-                
-                    
-                    
-                    
-                    
-                
-
-        
-        
-        return
-
     def stoppingCriteria(self):
         pass
     
