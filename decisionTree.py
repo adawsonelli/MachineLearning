@@ -114,7 +114,73 @@ class node:
         
     
     def determineCandidateSplits(self):
-        pass
+        """
+        determine from an internal list of attributes, which are candidates to split on.
+            -each nominal attribute (which has not been used before) is one candidate
+            -each numeric attribute is n candidates, where n is the number of class transitions
+            in an ordered list of instances D on numeric attribute Xi
+            
+        returns:
+            a list of candidate attribute ID's (nominal) and candidate attribute ID's + threashold
+            ex) [1 , [2 ,22.2] , [2,34.0], 4 , 5] 1,4,5 are nominal features, 2 is numerical
+        """
+        candidateSplits = [] 
+        for candidateSplit in self.atrIDs:
+            #nominal
+            if type(self.data['attributes'][candidateSplit][1]) == list:
+                candidateSplits.append(candidateSplit)  #all nominal types added once
+                
+            #numeric 3.12
+            if type(self.data['attributes'][candidateSplit][1]) == unicode:
+                #form a matrix Xi [numericFeature_col | class_col]
+                Xi = np.zeros([2,self.nInstances])
+                #create a lookup table for class labels (binary)
+                classDict = {self.data['attributes'][self.classCol][1][0]:1 ,  #negative
+                             self.data['attributes'][self.classCol][1][1]:0}   #positive
+                #populate matrix
+                for newID, instanceID in enumerate(self.instanceIDs):
+                    Xi[newID,0] = self.data['data'][instanceID][candidateSplit]
+                    Xi[newID,1] = classDict[self.data['data'][instanceID][self.classCol]]
+                #perform argsort, get indecies that would sort the array
+                sortIDs = np.argsort(Xi[0,:])
+                #form groups of same value numerical features and class change indicators:
+                #   0 == negative, 1 == positive, 2 = both in same group
+                groups = []
+                currentGroupLabel = Xi[sortIDs[0],0]
+                currentGroup = [Xi[sortIDs[0],0],Xi[sortIDs[0],0]]
+                for ID in sortIDs:
+                    if Xi[ID,0] != currentGroupLabel:
+                        groups.append(currentGroup)
+                        currentGroupLabel = Xi[ID,0]
+                        currentGroup = [Xi[ID,0],Xi[ID,1]]
+                    if Xi[ID,0] == currentGroupLabel:
+                        if currentGroup[1] != Xi[ID,1]:  #both groups in same class
+                            currentGroup[1] = 2
+                #form threasholds at the midpoint of disimilar groups
+                threasholds = []
+                for i in range(len(groups - 1)):
+                    if groups[i][1] != groups[i+1][1]: #class boundry
+                        threasholds.append((groups[i][0] + groups[i+1][0])/2)
+                
+                #append [candidate split , threashold] to list of candidate splits
+                for threashold in threasholds:
+                    candidateSplits.append([candidateSplit , threashold])
+        return candidateSplits 
+                    
+                    
+                        
+                    
+                    
+                
+                    
+                    
+                    
+                    
+                
+
+        
+        
+        return
 
     def stoppingCriteria(self):
         pass
