@@ -33,7 +33,7 @@ data = arff.load(open('weather.arff','rb'))
 
 #-------------------------- classes -------------------------------------------
 
-class node:
+class Node:
     """
     node forms the basic unit of the a tree 
     """     
@@ -132,7 +132,7 @@ class node:
             
            
     
-    def InfoGain(self,atrID, threashold = False):
+    def infoGain(self,atrID, threashold = False):
         """
         calculates the info gain of an attribute (specified by attribute ID) with
         respect to the node's instances
@@ -223,10 +223,10 @@ class node:
         for split in candidateSplits:
             #nominal feature
             if type(split == int):
-                infoGainList.append(self.InfoGain(split))
+                infoGainList.append(self.infoGain(split))
             #numeric feature
             if type(split == list):
-                infoGainList.append(self.InfoGain(split[0],split[1]))
+                infoGainList.append(self.infoGain(split[0],split[1]))
         
         #(iv)  there are no more remaining candidate splits
         if len(self.atrIDs) == 0 or len(candidateSplits) == 0:
@@ -234,13 +234,39 @@ class node:
         
         #none of the stopping criteria have been met
         return False
+    
+    def findClassLabel(self,parent):
+        """
+        All nodes calling this function are leaf nodes.The class label of a 
+        node is determined as follows:
+            
+            (i)   in the case where there are an unequal number of instance 
+                  of the two classes, predict the most common class
+            (ii)  in the case where there are an equal number of instances
+                  of the two classes, predict the most common class of the parent
+            (iii) if the number of instances in the node is zero, the leaf should
+                  predict the most common class of the parent
         
+        returns: class label 
+        """
+        #(i) 
+        if self.pos > self.neg:
+            return self.data['attributes'][self.classCol][1][0]
+        elif self.pos < self.neg:
+            return self.data['attributes'][self.classCol][1][1]
+        
+        #(ii) & (iii) 
+        elif self.pos == self.neg:  #this doesn't handle if the parent class also is the same
+            if parent.pos > parent.neg:
+                return parent.data['attributes'][parent.classCol][1][0]
+            elif parent.pos < parent.neg:
+                return parent.data['attributes'][parent.classCol][1][1]
+            
 
-
-    def FindBestSplit(self):
+    def findBestSplit(self):
         pass 
     
-    def makeSubtree(self):
+    def makeSubtree(self, parent = None):
         """
         starting from current node, make a subtree recursively
         """
@@ -248,7 +274,7 @@ class node:
         #check if stopping criteria met
         if self.stoppingCriteria():
             self.leaf = True
-            self.classLabel = 0 ## this should be the most populous label?
+            self.classLabel = findClassLabel(parent) ## this should be the most populous label?
         else:
             splitID = self.FindBestSplit() #feature ID
             # for each outcome k in S
