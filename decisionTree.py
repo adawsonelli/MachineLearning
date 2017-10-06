@@ -13,6 +13,14 @@ ID3
 # -another option that was not explored but could have been was using a more efficient
 #  data representation by replacing all nominal values with integers
 
+#data structures:
+#                            F_1  F_2  F_3 ... F_n
+#   data =   [  instance_1[                         ]
+#               instance_2[                         ]
+#               instance_n[                         ]      ]  
+#
+# implmented as lists of lists - data type is either float or unicode
+
 #-------------------------- imports -------------------------------------------
 import arff
 import numpy as np
@@ -56,7 +64,7 @@ class node:
         
         count = 0
         for i in self.instanceIDs:
-            if data['data'][i][self.classCol] == data['attributes'][i][1][classValueID]:
+            if data['data'][i][self.classCol] == data['attributes'][self.classCol][1][classValueID]:
                 count += 1
         return count
         
@@ -91,7 +99,7 @@ class node:
                 for ID in self.instanceIDs:
                     if self.data['data'][ID][atrID] == choice:
                         count += 1
-                        if self.data['data'][ID][self.classCol] == data['attributes'][ID][1][0]:
+                        if self.data['data'][ID][self.classCol] == data['attributes'][self.classCol][1][0]:
                             positive += 1
                 counts.append(count)
                 positives.append(positive)
@@ -109,11 +117,11 @@ class node:
             for ID in self.instanceIDs:
                 if self.data['data'][ID][atrID] <= threashold:
                     counts[0] += 1
-                    if self.data['data'][ID][self.classCol] == data['attributes'][ID][1][0]:
+                    if self.data['data'][ID][self.classCol] == data['attributes'][self.classCol][1][0]:
                          positives[0] += 1
                 else:
                     counts[1] += 1 
-                    if self.data['data'][ID][self.classCol] == data['attributes'][ID][1][0]:
+                    if self.data['data'][ID][self.classCol] == data['attributes'][self.classCol][1][0]:
                          positives[1] += 1
             #calculate weighted entropy for numerical attribute on this threashold:
             wHd = 0
@@ -186,9 +194,49 @@ class node:
                     candidateSplits.append([candidateSplit , threashold])
         return candidateSplits 
                     
-    def stoppingCriteria(self):
-        pass
-    
+    def stoppingCriteria(self,candidateSplits):
+        """
+        stopping criteria for making a leaf node are:
+            (i)   all training instances belonging to the node are the same class
+            (ii)  there are fewer than m training instances reaching the node
+            (iii) no feature has positive info gain
+            (iv)  there are no more remaining candidate splits
+        
+        return: True if should form a leaf, return false otherwise.
+        """
+        #(i) all training instances belonging to the node are the same class
+        positiveFlag = 0; negativeFlag = 0
+        for ID in self.instanceIDs:
+            if self.data['data'][ID][self.classCol] == data['attributes'][self.classCol][1][0]:
+                positiveFlag = 1;
+            else:
+                negativeFlag = 1;
+        if not (positiveFlag and negativeFlag):
+            return True
+        
+        #(ii)  there are fewer than m training instances reaching the node
+        if len(self.instanceIDs) < self.m:
+            return True
+        
+        #(iii) no feature has positive info gain
+        infoGainList = []
+        for split in candidateSplits:
+            #nominal feature
+            if type(split == int):
+                infoGainList.append(self.InfoGain(split))
+            #numeric feature
+            if type(split == list):
+                infoGainList.append(self.InfoGain(split[0],split[1]))
+        
+        #(iv)  there are no more remaining candidate splits
+        if len(self.atrIDs) == 0 or len(candidateSplits) == 0:
+            return True
+        
+        #none of the stopping criteria have been met
+        return False
+        
+
+
     def FindBestSplit(self):
         pass 
     
