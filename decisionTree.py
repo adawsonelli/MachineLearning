@@ -23,21 +23,25 @@ import math
 data = arff.load(open('weather.arff','rb'))
 
 
-
-
 #-------------------------- classes -------------------------------------------
 
 class node:
     """
     node forms the basic unit of the a tree 
-    """
-    def __init__(self, data , atrIDs , instanceIDs ):
-        self.data                                  #reference to system data dictionary
-        self.children = []                         #children nodes
+    """     
+    def __init__(self, data , m , atrIDs = None , instanceIDs = None):
+        #when initializing first top level node
+        if atrIDs == None and instanceIDs == None: 
+            atrIDs = range(len(data['data']))
+            instanceIDs = range(len(data['data']))
+            
+        self.data = data                               #reference to system data dictionary
+        self.m = m                                     #stopping criteria
+        self.children = []                             #children nodes
         self.isLeaf = False
-        self.classLabel = None                     #if leaf - define a class label
-        self.atrIDs = atrIDs                       #attributes this node is awair of
-        self.instanceIDs = instanceIDs             #list of training instance ID's this node contains
+        self.classLabel = None                         #if leaf - define a class label
+        self.atrIDs = atrIDs                           #attributes this node is awair of
+        self.instanceIDs = instanceIDs                 #list of training instance ID's this node contains
         self.nInstances = len(self.instanceIDs)
         self.classCol = len(self.data['data'][0]) - 1  #last column index is data
         self.pos = self.count('pos')             
