@@ -265,12 +265,27 @@ class Node:
 
     def findBestSplit(self, candidateSplits):
         """
-        score each of the candidate splits in terms of info gain. 
+        score each of the candidate splits in terms of info gain. and return best
         returns:
             if nominal:atrID of highest info gain 
             if numeric:[atrID, threashold]
         """
-        pass 
+        bestSplit  = {} ; bestSplit['infoGain'] = -1000
+        for cs in candidateSplits:
+            #nominal
+            if type(cs) == unicode:
+                infoGain = self.infoGain(cs)
+            #numeric
+            if type(cs) == list:
+                infoGain = self.infoGain(cs[0],cs[1])
+            
+            #handle infogain
+            if infoGain > bestSplit['infoGain']:
+                bestSplit['ID'] = cs
+                bestSplit['infoGain'] = infoGain
+        
+        return bestSplit['ID']
+    
     
     def makeSubtree(self, parent = None):   #[3.9]
         """
@@ -281,7 +296,7 @@ class Node:
         #check if stopping criteria met
         if self.stoppingCriteria(candidateSplits):
             self.leaf = True
-            self.classLabel = findClassLabel(parent)
+            self.classLabel = self.findClassLabel(parent)
         else:
             split = self.FindBestSplit(candidateSplits) #feature ID
             
@@ -310,7 +325,7 @@ class Node:
             #for each outcome k in S - make a new node and add to children
             childAtrIDs = self.atrIDs.remove(splitID) #can't split on this feature again (is this true for numerics?!)
             for childInstanceIDs in sortedInstances:
-                childNode = node(self.data,self.m,childAtrIDs,childInstanceIDs)
+                childNode = Node(self.data,self.m,childAtrIDs,childInstanceIDs)
                 self.children.append(childNode)
             
             #for each child, make a subtree
