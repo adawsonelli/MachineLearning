@@ -69,8 +69,10 @@ class Node:
         return count
         
     def Hd(self,positive,instances):  #assumes binary class label
-        Py = positive / instances ;  Pyc = 1 - Py
-        H = Py * math.log(Py , 2) - Pyc * math.log(Pyc , 2)
+        Py = float(positive) / instances ;  Pyc = 1 - Py
+        if Py == 0 or Pyc == 0:  #handle the case when log would blow up
+            return 0
+        H = - (Py * np.log2(Py) + Pyc * np.log2(Pyc))
         return H
         
     def entropy(self):
@@ -107,7 +109,7 @@ class Node:
             #calculate weighted entropy per choice (I.E. conditional entropy on atrID)  [3.27]
             wHd = 0
             for i, choice in enumerate(choices):
-                wHd += (counts[i]/self.nInstances) * self.Hd(positives[i],counts[i])
+                wHd += (float(counts[i])/self.nInstances) * self.Hd(positives[i],counts[i])
       
         
         #numeric type attributes

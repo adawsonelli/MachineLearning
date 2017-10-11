@@ -32,7 +32,7 @@ def fibo(n):
         return fibo(n-1) + fibo(n-2)
 
 #------------------ test out mulitple init functions --------------------------
-class InitTest:
+#class InitTest:
 #    def __init__(self,one,two):
 #        self.one = 1
 #        self.two = 2
