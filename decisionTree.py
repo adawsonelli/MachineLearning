@@ -263,23 +263,59 @@ class Node:
                 return parent.data['attributes'][parent.classCol][1][1]
             
 
-    def findBestSplit(self):
+    def findBestSplit(self, candidateSplits):
+        """
+        score each of the candidate splits in terms of info gain. 
+        returns:
+            if nominal:atrID of highest info gain 
+            if numeric:[atrID, threashold]
+        """
         pass 
     
-    def makeSubtree(self, parent = None):
+    def makeSubtree(self, parent = None):   #[3.9]
         """
         starting from current node, make a subtree recursively
         """
-        c = self.determineCandidateSplits()
+        candidateSplits = self.determineCandidateSplits()
+        
         #check if stopping criteria met
-        if self.stoppingCriteria():
+        if self.stoppingCriteria(candidateSplits):
             self.leaf = True
-            self.classLabel = findClassLabel(parent) ## this should be the most populous label?
+            self.classLabel = findClassLabel(parent)
         else:
-            splitID = self.FindBestSplit() #feature ID
-            # for each outcome k in S
-            #make a node with subset of indicies and attributes
-            #add node to list with append
+            split = self.FindBestSplit(candidateSplits) #feature ID
+            
+            #split on nominal feature
+            if type(split) == int:
+                splitID = split
+                nChoices = len(self.data['attributes'][splitID][1])
+                sortedInstances = []
+                for child in range(nChoices):sortedInstances.append([])
+                for ID in self.instanceIDs:
+                    for i, attribute in enumerate(self.data['attributes'][splitID][1]):
+                        if self.data['data'][ID][splitID] == attribute:
+                            sortedInstances[i].append(ID)
+                            
+            #split on numeric feature - guarenteed bifercation
+            if type(split) == list:
+                split[0] = splitID ; threashold = split[1]
+                sortedInstances = [[],[]]    #[[lower],[upper]]
+                for ID in self.instanceIDs:
+                    if self.data['data'][ID][splitID]   <= threashold:
+                        sortedInstances[0].append(ID)
+                    elif self.data['data'][ID][splitID]  < threashold:
+                        sortedInstances[1].append(ID)
+            
+            
+            #for each outcome k in S - make a new node and add to children
+            childAtrIDs = self.atrIDs.remove(splitID) #can't split on this feature again (is this true for numerics?!)
+            for childInstanceIDs in sortedInstances:
+                childNode = node(self.data,self.m,childAtrIDs,childInstanceIDs)
+                self.children.append(childNode)
+            
+            #for each child, make a subtree
+            for child in self.children:
+                child.makeSubtree(self)  #pass in self as parent
         
         return
             
