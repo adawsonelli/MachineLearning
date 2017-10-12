@@ -24,7 +24,7 @@ ID3
 #-------------------------- imports -------------------------------------------
 import arff
 import numpy as np
-import math
+
 
 
 #------------------------ load data -------------------------------------------
@@ -40,7 +40,7 @@ class Node:
     def __init__(self, data , m , atrIDs = None , instanceIDs = None):
         #when initializing first top level node
         if atrIDs == None and instanceIDs == None: 
-            atrIDs = range(len(data['data']))
+            atrIDs = range(len(data['attributes']) - 1)
             instanceIDs = range(len(data['data']))
             
         self.data = data                               #reference to system data dictionary
@@ -87,8 +87,8 @@ class Node:
         calculates conditional entropy of attributes given the conditions
         inputs:
              atrID - integer ID of the atribute to be evaluated
-             condition - if atr is nominal, condition is the nominal value ID
-                         if atr is numeric, condition is proposed threashold
+             threashold - if atr is nominal, threashold is discarded
+                          if atr is numeric, threashold is proposed threashold
         """
         #nominal / discrete type attributes:
         if type(self.data['attributes'][atrID][1]) == list: 
@@ -128,12 +128,12 @@ class Node:
             #calculate weighted entropy for numerical attribute on this threashold:
             wHd = 0
             for i , condition in enumerate(['belowThreashold','aboveThreashold']):
-                wHd += (counts[i]/self.nInstances) * self.Hd(positives[i],counts[i])
+                wHd += (float(counts[i])/self.nInstances) * self.Hd(positives[i],counts[i])
+            
+        return wHd
                
                     
             
-           
-    
     def infoGain(self,atrID, threashold = False):
         """
         calculates the info gain of an attribute (specified by attribute ID) with
@@ -162,7 +162,7 @@ class Node:
             #numeric 3.12
             if type(self.data['attributes'][candidateSplit][1]) == unicode:
                 #form a matrix Xi [numericFeature_col | class_col]
-                Xi = np.zeros([2,self.nInstances])
+                Xi = np.zeros([self.nInstances,2])
                 #create a lookup table for class labels (binary)
                 classDict = {self.data['attributes'][self.classCol][1][0]:1 ,  #negative
                              self.data['attributes'][self.classCol][1][1]:0}   #positive
@@ -171,23 +171,23 @@ class Node:
                     Xi[newID,0] = self.data['data'][instanceID][candidateSplit]
                     Xi[newID,1] = classDict[self.data['data'][instanceID][self.classCol]]
                 #perform argsort, get indecies that would sort the array
-                sortIDs = np.argsort(Xi[0,:])
+                sortIDs = np.argsort(Xi[:,0])
                 #form groups of same value numerical features and class change indicators:
                 #   0 == negative, 1 == positive, 2 = both in same group
                 groups = []
-                currentGroupLabel = Xi[sortIDs[0],0]
-                currentGroup = [Xi[sortIDs[0],0],Xi[sortIDs[0],0]]
+                currentGroupLabel = Xi[sortIDs[0],0]                #value of attribute
+                currentGroup = [Xi[sortIDs[0],0],Xi[sortIDs[0],1]]  #[value, class change indicator]
                 for ID in sortIDs:
                     if Xi[ID,0] != currentGroupLabel:
                         groups.append(currentGroup)
                         currentGroupLabel = Xi[ID,0]
                         currentGroup = [Xi[ID,0],Xi[ID,1]]
                     if Xi[ID,0] == currentGroupLabel:
-                        if currentGroup[1] != Xi[ID,1]:  #both groups in same class
+                        if currentGroup[1] != Xi[ID,1]:  #2 member of group in diff classes
                             currentGroup[1] = 2
                 #form threasholds at the midpoint of disimilar groups
                 threasholds = []
-                for i in range(len(groups - 1)):
+                for i in range(len(groups) - 1):
                     if groups[i][1] != groups[i+1][1]: #class boundry
                         threasholds.append((groups[i][0] + groups[i+1][0])/2)
                 
@@ -196,7 +196,8 @@ class Node:
                     candidateSplits.append([candidateSplit , threashold])
         return candidateSplits 
                     
-    def stoppingCriteria(self,candidateSplits):
+
+    def stoppingCriteria(self,candidateSplits = False):
         """
         stopping criteria for making a leaf node are:
             (i)   all training instances belonging to the node are the same class
@@ -274,7 +275,7 @@ class Node:
 
     def findBestSplit(self, candidateSplits):
         """
-        score each of the candidate splits in terms of info gain. and return best
+        score each of the candidate splits in terms of info gain and return best split
         returns:
             if nominal:atrID of highest info gain 
             if numeric:[atrID, threashold]
@@ -282,10 +283,10 @@ class Node:
         bestSplit  = {} ; bestSplit['infoGain'] = -1000
         for cs in candidateSplits:
             #nominal
-            if type(cs) == unicode:
+            if type(cs) == int:
                 infoGain = self.infoGain(cs)
             #numeric
-            if type(cs) == list:
+            elif type(cs) == list:
                 infoGain = self.infoGain(cs[0],cs[1])
             
             #handle infogain
@@ -329,7 +330,7 @@ class Node:
                             
             #split on numeric feature - guarenteed bifercation
             if type(split) == list:
-                split[0] = splitID ; threashold = split[1]
+                splitID = split[0] ; threashold = split[1]
                 sortedInstances = [[],[]]    #[[lower],[upper]]
                 for ID in self.instanceIDs:
                     if self.data['data'][ID][splitID]   <= threashold:
@@ -339,7 +340,8 @@ class Node:
             
             
             #for each outcome k in S - make a new node and add to children
-            childAtrIDs = self.atrIDs.remove(splitID) #can't split on this feature again (is this true for numerics?!)
+            childAtrIDs = self.atrIDs[:] #can't split on this feature again (is this true for numerics?!)
+            childAtrIDs.remove(splitID)
             for childInstanceIDs in sortedInstances:
                 childNode = Node(self.data,self.m,childAtrIDs,childInstanceIDs)
                 self.children.append(childNode)
@@ -360,7 +362,7 @@ root.makeSubtree()
 #root.conditionalEntropy(0,False)
 
 #---------------------------- tests -------------------------------------------
-tests = True
+tests = False
 import unittest
 data = arff.load(open('weather.arff','rb'))
 root = Node(data,2)
@@ -376,7 +378,7 @@ class TestID3(unittest.TestCase):
     
     def testDetermineCandidateSplits(self):
         cs = [0, [1, 64.5], [1, 66.5], [1, 70.5], [1, 71.5], [1, 73.5], [1, 77.5], [1, 80.5],
-             [2, 67.5], [2, 72.5], [2, 82.5], [2, 85.5], [2, 88.0], [2, 90.5], 3, 4]
+             [2, 67.5], [2, 72.5], [2, 82.5], [2, 85.5], [2, 88.0], [2, 90.5], 3]
         self.assertEqual(root.determineCandidateSplits(),cs)
     
     def testEntropy(self):
