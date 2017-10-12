@@ -206,35 +206,42 @@ class Node:
         
         return: True if should form a leaf, return false otherwise.
         """
-        #(i) all training instances belonging to the node are the same class
-        positiveFlag = 0; negativeFlag = 0
-        for ID in self.instanceIDs:
-            if self.data['data'][ID][self.classCol] == data['attributes'][self.classCol][1][0]:
-                positiveFlag = 1;
-            else:
-                negativeFlag = 1;
-        if not (positiveFlag and negativeFlag):
-            return True
+        #first check for stopping criteria - doen't require candidateSplit info
+        if candidateSplits == False:
+                #(i) all training instances belonging to the node are the same class
+            positiveFlag = 0; negativeFlag = 0
+            for ID in self.instanceIDs:
+                if self.data['data'][ID][self.classCol] == data['attributes'][self.classCol][1][0]:
+                    positiveFlag = 1;
+                else:
+                    negativeFlag = 1;
+            if not (positiveFlag and negativeFlag):
+                return True
+            
+             #(ii)  there are fewer than m training instances reaching the node
+            if len(self.instanceIDs) < self.m:
+                return True
         
-        #(ii)  there are fewer than m training instances reaching the node
-        if len(self.instanceIDs) < self.m:
-            return True
-        
-        #(iii) no feature has positive info gain
-        infoGainList = []
-        for split in candidateSplits:
-            #nominal feature
-            if type(split == int):
-                infoGainList.append(self.infoGain(split))
-            #numeric feature
-            if type(split == list):
-                infoGainList.append(self.infoGain(split[0],split[1]))
-        
-        #(iv)  there are no more remaining candidate splits
-        if len(self.atrIDs) == 0 or len(candidateSplits) == 0:
-            return True
-        
-        #none of the stopping criteria have been met
+        #second check for stopping criteria - requires candidate split info
+        else:             
+            #(iii) no feature has positive info gain
+            infoGainSum = 0
+            for split in candidateSplits:
+                #nominal feature
+                if type(split) == int:
+                    infoGainSum += self.infoGain(split)
+                #numeric feature
+                if type(split) == list:
+                    infoGainSum += self.infoGain(split[0],split[1])
+            
+            if infoGainSum == 0:
+                return True
+                    
+            #(iv)  there are no more remaining candidate splits
+            if len(self.atrIDs) == 0 or len(candidateSplits) == 0:
+                return True
+            
+            #none of the stopping criteria have been met
         return False
     
     def findClassLabel(self,parent):
@@ -293,14 +300,21 @@ class Node:
         """
         starting from current node, make a subtree recursively
         """
+        #first stopping criteria check - doesn't require candidate splits
+        if self.stoppingCriteria():
+             self.leaf = True
+             self.classLabel = self.findClassLabel(parent)
+             return
+             
+        #calculate candidate splits
         candidateSplits = self.determineCandidateSplits()
         
-        #check if stopping criteria met
+        #second stopping criteria check - requires candidate splits
         if self.stoppingCriteria(candidateSplits):
             self.leaf = True
             self.classLabel = self.findClassLabel(parent)
         else:
-            split = self.FindBestSplit(candidateSplits) #feature ID
+            split = self.findBestSplit(candidateSplits) #feature ID
             
             #split on nominal feature
             if type(split) == int:
