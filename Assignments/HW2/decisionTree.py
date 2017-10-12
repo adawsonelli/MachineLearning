@@ -355,14 +355,38 @@ class Node:
         pass
 
 
+root = Node(data,2)
+root.makeSubtree()
+#root.conditionalEntropy(0,False)
+
 #---------------------------- tests -------------------------------------------
+tests = True
+import unittest
+data = arff.load(open('weather.arff','rb'))
+root = Node(data,2)
 
 class TestID3(unittest.TestCase):
-    
     def testNode(self):
-        pass
+        
+        #test that all internal state information was created properly
+        self.assertEqual(root.atrIDs,range(4))
+        self.assertEqual(root.instanceIDs,range(14))
+        self.assertEqual(root.classCol,4)
+        self.assertEqual(root.pos + root.neg,root.nInstances)
+    
+    def testDetermineCandidateSplits(self):
+        cs = [0, [1, 64.5], [1, 66.5], [1, 70.5], [1, 71.5], [1, 73.5], [1, 77.5], [1, 80.5],
+             [2, 67.5], [2, 72.5], [2, 82.5], [2, 85.5], [2, 88.0], [2, 90.5], 3, 4]
+        self.assertEqual(root.determineCandidateSplits(),cs)
+    
+    def testEntropy(self):
+        self.assertEqual(root.entropy(),0.94028595867063114)
+        
+#    def testConditionalEntropy(self):
+#        self.assertEqual(root.conditionalEntropy(0,False),)
+    
 
 
-tests = True
+
 if tests:
     unittest.main()
