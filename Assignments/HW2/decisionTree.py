@@ -191,6 +191,10 @@ class Node:
                     if Xi[ID,0] == currentGroupLabel:
                         if currentGroup[1] != Xi[ID,1]:  #2 member of group in diff classes
                             currentGroup[1] = 2
+                #add on last group if it was missed (may allways be missed?)
+                if groups[-1:] != currentGroup:  #end
+                    groups.append(currentGroup)
+                    
                 #form threasholds at the midpoint of disimilar groups
                 threasholds = []
                 for i in range(len(groups) - 1):
@@ -379,11 +383,11 @@ class Node:
             
             #nominal split
             if type(self.split) == int:
-                splitName =         data['attributes'][self.split][0]
-                childChoice = ' = ' + data['attributes'][self.split][1][childID]
+                splitName =         self.data['attributes'][self.split][0]
+                childChoice = ' = ' + self.data['attributes'][self.split][1][childID]
             #numeric split -> bifercation
             elif type(self.split) == list:
-                splitName = data['attributes'][self.split[0]][0]
+                splitName = self.data['attributes'][self.split[0]][0]
                 if childID == 0: #lower
                     childChoice =  ' <= '  + str(self.split[1])
                 if childID == 1: #upper
@@ -620,5 +624,6 @@ if tests:
 #root = Node(data,2)
 #root.makeSubtree()
 #root.printTree()
-results = plotLearningCurves()    
+#results = plotLearningCurves()  
+runTestSet()
     
