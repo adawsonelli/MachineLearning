@@ -409,19 +409,75 @@ class Node:
         
         
     
-    def classify(self):
+    def classify(self,instance):
         """
-        take an unknown instance make a prediction abo
+        take an unknown instance make a prediction about it's class
+        inputs:
+            instance - a list of attributes
+        outputs:
+            a prediction of class
         """
+        if self.isLeaf:
+            return self.classLabel
+        
+        #nominal feature
+        if type(self.split) == int:
+            featureValue = instance[self.split]
+            for i, child in enumerate(self.children):  #children are stored in the order the attributes appear
+                if featureValue == self.data['attributes'][self.split][1][i]:
+                    return child.classify(instance)  #enter that child node
+        
+        #numeric feature
+        if type(self.split) == list:
+            featureValue = instance[self.split[0]]
+            if featureValue <= self.split[1]:
+                return self.children[0].classify(instance)
+            if featureValue > self.split[1]:
+                return self.children[1].classify(instance)
+        
+        
+            
+            
+        
+            
+        
+        
 
 
-root = Node(data,20)
+root = Node(data,2)
 root.makeSubtree()
 root.printTree()
 #root.conditionalEntropy(0,False)
 
 #-------------------------- test set functions --------------------------------
-
+def runTestSet(fileName = 'heart', m = 2):
+    """
+    trains tree, then loads and runs test set given filename
+    """
+    
+    #train tree
+    training = fileName + '_train.arff'
+    trainingData = arff.load(open(training,'rb'))
+    
+    root = Node(trainingData, m)
+    root.makeSubtree()
+    root.printTree()
+    
+    #run test set
+    testing = fileName + '_test.arff'
+    testingData = arff.load(open(testing,'rb'))
+    f = open("outputTree.txt",'a')  #append to existing file
+    f.write("<Predictions for the Test Set Instances> \n")
+    correct = 0
+    for i, instance in enumerate(testingData['data']):
+        classification = root.classify(instance)
+        f.write(str(i + 1) + ": Actual: " + str(instance[root.classCol]) + " Predicted: " + str(classification) + "\n" )
+        if str(instance[root.classCol]) == str(classification):
+            correct += 1
+    #print total sucess rate
+    f.write("Number of correctly classifed: " + str(correct) + " Total number of test instances: " + str(len(testingData['data'])))
+    
+    
 
 #-------------------------- generate plots ------------------------------------
 
