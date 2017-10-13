@@ -28,21 +28,23 @@ import numpy as np
 
 
 #------------------------ load data -------------------------------------------
-data = arff.load(open('weather.arff','rb'))
+#data = arff.load(open('weather.arff','rb'))
+data = arff.load(open('heart_train.arff','rb'))
 
 
-#-------------------------- classes -------------------------------------------
+#-------------------------- Node class ----------------------------------------
 
 class Node:
     """
     node forms the basic unit of the a tree 
     """     
-    def __init__(self, data , m , atrIDs = None , instanceIDs = None):
+    def __init__(self, data , m , parent = None, atrIDs = None , instanceIDs = None):
         #when initializing first top level node
         if atrIDs == None and instanceIDs == None: 
             atrIDs = range(len(data['attributes']) - 1)
             instanceIDs = range(len(data['data']))
-            
+         
+        self.parent = parent                           #parent node
         self.data = data                               #reference to system data dictionary
         self.m = m                                     #stopping criteria
         self.children = []                             #children nodes
@@ -50,6 +52,7 @@ class Node:
         self.classLabel = None                         #if leaf - define a class label
         self.atrIDs = atrIDs                           #attributes this node is awair of
         self.instanceIDs = instanceIDs                 #list of training instance ID's this node contains
+        self.split = None                              #which attribute does this node split on?
         self.nInstances = len(self.instanceIDs)
         self.classCol = len(self.data['data'][0]) - 1  #last column index is data
         self.pos = self.count('pos')             
@@ -69,6 +72,8 @@ class Node:
         return count
         
     def Hd(self,positive,instances):  #assumes binary class label
+        if positive == 0 or instances == 0:  #divde by zero error
+            return 0
         Py = float(positive) / instances ;  Pyc = 1 - Py
         if Py == 0 or Pyc == 0:  #handle the case when log would blow up
             return 0
@@ -188,7 +193,7 @@ class Node:
                 #form threasholds at the midpoint of disimilar groups
                 threasholds = []
                 for i in range(len(groups) - 1):
-                    if groups[i][1] != groups[i+1][1]: #class boundry
+                    if groups[i][1] != groups[i+1][1] or (groups[i][1] == 2 or groups[i+1][1] == 2): #class boundry
                         threasholds.append((groups[i][0] + groups[i+1][0])/2)
                 
                 #append [candidate split , threashold] to list of candidate splits
@@ -209,7 +214,7 @@ class Node:
         """
         #first check for stopping criteria - doen't require candidateSplit info
         if candidateSplits == False:
-                #(i) all training instances belonging to the node are the same class
+            #(i) all training instances belonging to the node are the same class
             positiveFlag = 0; negativeFlag = 0
             for ID in self.instanceIDs:
                 if self.data['data'][ID][self.classCol] == data['attributes'][self.classCol][1][0]:
@@ -220,7 +225,7 @@ class Node:
                 return True
             
              #(ii)  there are fewer than m training instances reaching the node
-            if len(self.instanceIDs) < self.m:
+            if self.nInstances < self.m:
                 return True
         
         #second check for stopping criteria - requires candidate split info
@@ -245,7 +250,7 @@ class Node:
             #none of the stopping criteria have been met
         return False
     
-    def findClassLabel(self,parent):
+    def findClassLabel(self):
         """
         All nodes calling this function are leaf nodes.The class label of a 
         node is determined as follows:
@@ -266,11 +271,8 @@ class Node:
             return self.data['attributes'][self.classCol][1][1]
         
         #(ii) & (iii) 
-        elif self.pos == self.neg:  #this doesn't handle if the parent class also is the same
-            if parent.pos > parent.neg:
-                return parent.data['attributes'][parent.classCol][1][0]
-            elif parent.pos < parent.neg:
-                return parent.data['attributes'][parent.classCol][1][1]
+        elif self.pos == self.neg: 
+            return self.parent.findClassLabel()
             
 
     def findBestSplit(self, candidateSplits):
@@ -280,7 +282,7 @@ class Node:
             if nominal:atrID of highest info gain 
             if numeric:[atrID, threashold]
         """
-        bestSplit  = {} ; bestSplit['infoGain'] = -1000
+        bestSplit  = {} ; bestSplit['infoGain'] = -1000 ; bestSplit['IDs'] = []
         for cs in candidateSplits:
             #nominal
             if type(cs) == int:
@@ -290,21 +292,25 @@ class Node:
                 infoGain = self.infoGain(cs[0],cs[1])
             
             #handle infogain
+            if infoGain == bestSplit['infoGain']: # we have a tie!
+                bestSplit['IDs'].append(cs)
             if infoGain > bestSplit['infoGain']:
-                bestSplit['ID'] = cs
+                bestSplit['IDs'] = []
+                bestSplit['IDs'].append(cs)
                 bestSplit['infoGain'] = infoGain
-        
-        return bestSplit['ID']
+            
+        #break ties by always taking the first added to the list
+        return bestSplit['IDs'][0]
     
     
-    def makeSubtree(self, parent = None):   #[3.9]
+    def makeSubtree(self):   #[3.9]
         """
         starting from current node, make a subtree recursively
         """
         #first stopping criteria check - doesn't require candidate splits
         if self.stoppingCriteria():
-             self.leaf = True
-             self.classLabel = self.findClassLabel(parent)
+             self.isLeaf = True
+             self.classLabel = self.findClassLabel()
              return
              
         #calculate candidate splits
@@ -312,10 +318,11 @@ class Node:
         
         #second stopping criteria check - requires candidate splits
         if self.stoppingCriteria(candidateSplits):
-            self.leaf = True
-            self.classLabel = self.findClassLabel(parent)
+            self.isLeaf = True
+            self.classLabel = self.findClassLabel()
         else:
             split = self.findBestSplit(candidateSplits) #feature ID
+            self.split = split
             
             #split on nominal feature
             if type(split) == int:
@@ -335,37 +342,99 @@ class Node:
                 for ID in self.instanceIDs:
                     if self.data['data'][ID][splitID]   <= threashold:
                         sortedInstances[0].append(ID)
-                    elif self.data['data'][ID][splitID]  < threashold:
+                    elif self.data['data'][ID][splitID]  > threashold:
                         sortedInstances[1].append(ID)
             
             
             #for each outcome k in S - make a new node and add to children
             childAtrIDs = self.atrIDs[:] #can't split on this feature again (is this true for numerics?!)
-            childAtrIDs.remove(splitID)
+            #childAtrIDs.remove(splitID)
             for childInstanceIDs in sortedInstances:
-                childNode = Node(self.data,self.m,childAtrIDs,childInstanceIDs)
+                childNode = Node(self.data,self.m,self,childAtrIDs,childInstanceIDs)
                 self.children.append(childNode)
             
             #for each child, make a subtree
             for child in self.children:
-                child.makeSubtree(self)  #pass in self as parent
+                child.makeSubtree() 
         
         return
             
     
-    def printTree(self):
-        pass
+    def printTree(self,f = "outputTree.txt", nTabs = 0):
+        """
+        prints the contents of the trained tree into a file
+        inputs:
+            f - either fileName or a file object
+            tabs - int number of tabs
+        """
+        #handle input file
+        if type(f) == file:
+            pass
+        elif type(f) == str:
+            f = open("outputTree.txt",'w')
+            
+        #handle basecase - leaf node
+        if self.isLeaf:
+            return
+       
+        #build string and write to file
+        for childID, child in enumerate(self.children):
+            #build printing string
+            strTab = nTabs * '|    '
+            
+            #nominal split
+            if type(self.split) == int:
+                splitName =         data['attributes'][self.split][0]
+                childChoice = ' = ' + data['attributes'][self.split][1][childID]
+            #numeric split -> bifercation
+            elif type(self.split) == list:
+                splitName = data['attributes'][self.split[0]][0]
+                if childID == 0: #lower
+                    childChoice =  ' <= '  + str(self.split[1])
+                if childID == 1: #upper
+                    childChoice =  ' >  '  + str(self.split[1])
+                    
+                
+            #determine classification split at this node
+            classSplit = "[" + str(child.pos) + ' ' + str(child.neg) + "]"
+            
+            #leaf node -> report class prediction
+            if child.isLeaf:
+                leaf = ":" + str(child.classLabel)
+                f.write(strTab + splitName + childChoice + classSplit + leaf + "\n")
+                child.printTree(f,nTabs + 1)
+            else:
+                f.write(strTab + splitName + childChoice + classSplit + "\n")
+                child.printTree(f,nTabs + 1)
+        
+        
+    
+    def classify(self):
+        """
+        take an unknown instance make a prediction abo
+        """
 
 
-root = Node(data,2)
+root = Node(data,20)
 root.makeSubtree()
+root.printTree()
 #root.conditionalEntropy(0,False)
+
+#-------------------------- test set functions --------------------------------
+
+
+#-------------------------- generate plots ------------------------------------
+
+
 
 #---------------------------- tests -------------------------------------------
 tests = False
 import unittest
-data = arff.load(open('weather.arff','rb'))
-root = Node(data,2)
+if tests:
+    data = arff.load(open('weather.arff','rb'))
+    root = Node(data,2)
+
+
 
 class TestID3(unittest.TestCase):
     def testNode(self):
