@@ -24,12 +24,13 @@ ID3
 #-------------------------- imports -------------------------------------------
 import arff
 import numpy as np
+from matplotlib import pyplot as plt
 
 
 
 #------------------------ load data -------------------------------------------
 #data = arff.load(open('weather.arff','rb'))
-data = arff.load(open('heart_train.arff','rb'))
+#data = arff.load(open('heart_train.arff','rb'))
 
 
 #-------------------------- Node class ----------------------------------------
@@ -67,7 +68,7 @@ class Node:
         
         count = 0
         for i in self.instanceIDs:
-            if data['data'][i][self.classCol] == data['attributes'][self.classCol][1][classValueID]:
+            if self.data['data'][i][self.classCol] == self.data['attributes'][self.classCol][1][classValueID]:
                 count += 1
         return count
         
@@ -106,7 +107,7 @@ class Node:
                 for ID in self.instanceIDs:
                     if self.data['data'][ID][atrID] == choice:
                         count += 1
-                        if self.data['data'][ID][self.classCol] == data['attributes'][self.classCol][1][0]:
+                        if self.data['data'][ID][self.classCol] == self.data['attributes'][self.classCol][1][0]:
                             positive += 1
                 counts.append(count)
                 positives.append(positive)
@@ -124,11 +125,11 @@ class Node:
             for ID in self.instanceIDs:
                 if self.data['data'][ID][atrID] <= threashold:
                     counts[0] += 1
-                    if self.data['data'][ID][self.classCol] == data['attributes'][self.classCol][1][0]:
+                    if self.data['data'][ID][self.classCol] == self.data['attributes'][self.classCol][1][0]:
                          positives[0] += 1
                 else:
                     counts[1] += 1 
-                    if self.data['data'][ID][self.classCol] == data['attributes'][self.classCol][1][0]:
+                    if self.data['data'][ID][self.classCol] == self.data['attributes'][self.classCol][1][0]:
                          positives[1] += 1
             #calculate weighted entropy for numerical attribute on this threashold:
             wHd = 0
@@ -215,13 +216,7 @@ class Node:
         #first check for stopping criteria - doen't require candidateSplit info
         if candidateSplits == False:
             #(i) all training instances belonging to the node are the same class
-            positiveFlag = 0; negativeFlag = 0
-            for ID in self.instanceIDs:
-                if self.data['data'][ID][self.classCol] == data['attributes'][self.classCol][1][0]:
-                    positiveFlag = 1;
-                else:
-                    negativeFlag = 1;
-            if not (positiveFlag and negativeFlag):
+            if self.pos == 0 or self.neg == 0:
                 return True
             
              #(ii)  there are fewer than m training instances reaching the node
@@ -436,20 +431,20 @@ class Node:
                 return self.children[1].classify(instance)
         
         
-            
-            
-        
-            
-        
-        
-
-
-root = Node(data,2)
-root.makeSubtree()
-root.printTree()
-#root.conditionalEntropy(0,False)
 
 #-------------------------- test set functions --------------------------------
+def evaluateAccuracy(root, Data):
+    """
+    takes in a dataset and returns the percentage of instances properly classified
+    """
+    correct = 0
+    for i, instance in enumerate(Data['data']):
+        classification = root.classify(instance)
+        if str(instance[root.classCol]) == str(classification):
+            correct += 1
+    return float(correct) / len(Data['data'])
+
+
 def runTestSet(fileName = 'heart', m = 2):
     """
     trains tree, then loads and runs test set given filename
@@ -480,9 +475,110 @@ def runTestSet(fileName = 'heart', m = 2):
     
 
 #-------------------------- generate plots ------------------------------------
-
-
-
+def plotLearningCurves(fileName = 'heart', m = 2):  #part 2
+    """
+    plot the learning curve which shows predictive accuracy vs training set size
+    for a constant m = 4
+    """
+    
+    #setup dataset over which numerical experiment will take place
+    training = fileName + '_train.arff'
+    trainingData = arff.load(open(training,'rb'))
+    
+    #setup testing set
+    testing = fileName + '_test.arff'
+    testingData = arff.load(open(testing,'rb'))
+    
+    
+    
+    #loop over specified percentages
+    percentages = [.05,.1,.2,.5,1.0]
+    results = [[],[],[],[],[]]
+    trainingSetLen = len(trainingData['data'])
+    for i , p in enumerate(percentages):
+        
+        #random samples at specified percentage
+        for sample in range(10): #perform 10 times per percentage
+                      
+            #make a local copy of training data
+            Data = trainingData.copy()
+            Data['data'] = []             #clean data set
+            
+            #randomly select n*p samples from training set, without replacement - unique samples
+            sampleIndecies = range(trainingSetLen)
+            nSamples = int(np.floor(p*trainingSetLen))
+            for s in range(nSamples):
+                setLen = len(sampleIndecies)
+                popID = np.random.randint(0,setLen)
+                
+                #draw one datapoint without replacement
+                sampleID = sampleIndecies.pop(popID)
+                
+                #add datapoint to training data
+                Data['data'].append(trainingData['data'][sampleID])
+        
+            #train tree
+            root = Node(Data, m)
+            root.makeSubtree()
+            
+            #test tree for accuracy
+            accuracy = evaluateAccuracy(root,testingData)
+            
+            #store accuracy
+            results[i].append(accuracy)
+    
+    #make plots
+    Min = [] ; Max = [] ; mean = []
+    for p,percentage in enumerate(percentages):
+        Min.append(min(results[p]))
+        Max.append(max(results[p]))
+        mean.append(sum(results[p])/len(results[p]))
+    
+    plt.plot(percentages,Min)
+    plt.plot(percentages,mean)
+    plt.plot(percentages,Max)
+    plt.ylabel('accuracy')
+    plt.xlabel('percentage of training set')
+    plt.title('prediction accuracy vs. percentage of training set @ m = 4')
+    plt.grid()
+    
+    
+                
+             
+    
+    
+def plotAccuracyVsTreeSize(fileName = 'heart'):
+    """
+    plot the Accuracy of the tree vs size for the entire training set
+    """
+    #setup dataset over which numerical experiment will take place
+    training = fileName + '_train.arff'
+    trainingData = arff.load(open(training,'rb'))
+    
+    #setup testing set
+    testing = fileName + '_test.arff'
+    testingData = arff.load(open(testing,'rb'))
+    
+    
+    M = [2,5,10,20]
+    accuracy = []
+    for m in M:
+        root = Node(trainingData, m)
+        root.makeSubtree()
+        accuracy.append(evaluateAccuracy(root,testingData))
+    
+    
+    #plot m vs. tree accuracy
+    plt.plot(M,accuracy)
+    plt.plot(M,accuracy,'ro')
+    plt.ylabel('accuracy')
+    plt.xlabel('m stopping criteria')
+    plt.title('prediction accuracy vs. m stopping criteria')
+    plt.grid()
+    
+    
+    
+        
 #---------------------------- tests -------------------------------------------
 tests = False
 import unittest
@@ -517,3 +613,12 @@ class TestID3(unittest.TestCase):
 
 if tests:
     unittest.main()
+    
+    
+
+##------------------------------- main -----------------------------------------   
+#root = Node(data,2)
+#root.makeSubtree()
+#root.printTree()
+results = plotLearningCurves()    
+    
