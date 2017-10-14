@@ -476,10 +476,37 @@ def runTestSet(fileName = 'heart', m = 2):
     #print total sucess rate
     f.write("Number of correctly classifed: " + str(correct) + " Total number of test instances: " + str(len(testingData['data'])))
     
+
+def outputTestResults(trainingFileName, testFileName, m):
+    """
+    trains tree, then loads and runs test set given filename
+    """
+    #train tree
+    trainingData = arff.load(open(trainingFileName,'rb'))
+    
+    root = Node(trainingData, m)
+    root.makeSubtree()
+    root.printTree()
+    
+    #run test set
+    testingData = arff.load(open(testFileName,'rb'))
+    f = open("outputTree.txt",'a')  #append to existing file
+    f.write("<Predictions for the Test Set Instances> \n")
+    correct = 0
+    for i, instance in enumerate(testingData['data']):
+        classification = root.classify(instance)
+        f.write(str(i + 1) + ": Actual: " + str(instance[root.classCol]) + " Predicted: " + str(classification) + "\n" )
+        if str(instance[root.classCol]) == str(classification):
+            correct += 1
+    #print total sucess rate
+    f.write("Number of correctly classifed: " + str(correct) + " Total number of test instances: " + str(len(testingData['data'])))
+
+
+
     
 
 #-------------------------- generate plots ------------------------------------
-def plotLearningCurves(fileName = 'heart', m = 2):  #part 2
+def plotLearningCurves(fileName = 'heart', m = 4):  #part 2
     """
     plot the learning curve which shows predictive accuracy vs training set size
     for a constant m = 4
@@ -625,5 +652,5 @@ if tests:
 #root.makeSubtree()
 #root.printTree()
 #results = plotLearningCurves()  
-runTestSet()
+#runTestSet()
     
