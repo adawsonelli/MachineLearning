@@ -17,9 +17,10 @@ from matplotlib import pyplot as plt
 #------------------------------- classes --------------------------------------
 class NeuralNetwork:
     """
-    neuralnet trainfile num_folds learning_rate num_epochs 
+    NeuralNetwork - 3 layer neural network with an input layer, one hidden layer, 
+    and a single output node used classification.
     """
-    def __init__(self,fileName ="sonar.arff",nFolds = 10, eta = .05, numEpochs = 5000):
+    def __init__(self,fileName ="sonar.arff", nFolds = 10, eta = .05, numEpochs = 5000):
         
         #system parameters
         self.nFolds = nFolds
@@ -35,13 +36,22 @@ class NeuralNetwork:
         self.pos = self.count('pos')
         self.neg = self.count('neg')
         self.nInstances =  self.data.shape[0]     
-        self.nAttributes = self.data.shape[1] 
+        self.nAttributes = self.data.shape[1] - 1 
         
         #separate dataset into nFold stratified Groups:
         self.Folds = self.makeNFolds()
         #self.FoldIDs  #defined elseware in context
-       
         
+        #NN state information
+        self.W = []  #weights from i to h    [nAttributes x nAttributes]
+        self.u = []  #weights from h to y    [nAttributes x 1]'
+        self.b = []  #bias vector from       [nAttributes x 1]
+        self.c = []  #bias of output y       [1x1]
+        
+        #vectorized functions
+        self.vSigmoid = np.vectorize(sigmoid)
+        
+
     
     def importarff(self,fileName):
         """
@@ -158,10 +168,51 @@ class NeuralNetwork:
      
     def train(self, trainingSet):
         """
+        train the NN state information - using a stochastic gradient decent 
+        approach.
+        inputs: 
+            training set
+        outputs:
+            (implicit) state adjustment on W,u,b,c
+        """
+        #wipe system state clean with new random weights
+        self.initState(trainingSet)
+        #
         
+        
+    
+    def initState(self):
+        """
+        initialize the state of the neural network, i.e. all bias vectors and weights
+        """
+        wScale = .01
+        self.W = np.random.normal(0,wScale,(self.nAttributes,self.nAttributes))
+        self.u = np.random.normal(0,wScale,(self.nAttributes,1))   #use u'
+        self.b = np.random.uniform(0,1,(self.nAttributes,1))  #what should be the scale on this??
+        self.c = np.random.uniform(0,1,(1,1))
+        
+    
+    def forwardPropagation(self, x):
+        """
+        starting with input instance x - determine output y for the current set
+        of sytem weights W and u, as well as system biases b and c
+        x = input instance       [nAttributes + 1]
+        h = hidden layer outputs [nAttribues]        
+        """
+        #trim class label off of x
+        x = x[0:-1]
+        
+        #perform forward propagation
+        h = self.vSigmoid(np.matmul(self.W,x.transpose()) + self.b)
+        y = self.vSigmoid(np.matmul(self.u.transpose(),h) + self.c)
+        
+        return y
+    
+    def backwardPropagation(self):
+        """
         """
         pass
-    
+        
     def test(self,testSet):
         """
         """
@@ -210,6 +261,12 @@ def merge(foldList):
     for fold in foldList:
         np.vstack(allFolds,fold)
     return allFolds
+
+def sigmoid(x):
+    """
+    scalar sigmoid function
+    """
+    return  1/(1 + np.exp(-x))
         
     
         
