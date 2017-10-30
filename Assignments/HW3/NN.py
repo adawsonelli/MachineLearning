@@ -19,12 +19,16 @@ class NeuralNetwork:
     """
     neuralnet trainfile num_folds learning_rate num_epochs 
     """
-    def __init__(self,fileName ="sonar.arff",nFolds = 10,eta = .05, numEpochs = 5000):
+    def __init__(self,fileName ="sonar.arff",nFolds = 10, eta = .05, numEpochs = 5000):
         
-        # system parameters
+        #system parameters
         self.nFolds = nFolds
         self.eta = eta
         self.numEpochs = numEpochs
+        
+        #system hypeParameters
+        self.miniBatchSize = 3
+        self.ClassThreashold = .5
         
         #initialize dataset:
         self.data = self.importarff(fileName)
@@ -35,6 +39,7 @@ class NeuralNetwork:
         
         #separate dataset into nFold stratified Groups:
         self.Folds = self.makeNFolds()
+        #self.FoldIDs  #defined elseware in context
        
         
     
@@ -88,7 +93,8 @@ class NeuralNetwork:
         of classes. This is known as an n-folds stratified set
         returns: list for numpy arrays
         """
-        Folds = [] #init empty fold set
+        Folds = []        #init empty fold set
+        self.FoldIDs = []      #instance ID's per set will be useful for printing
         
         #make lists of positive and negative instance ID's
         posIDs = [] ; negIDs = []
@@ -129,10 +135,47 @@ class NeuralNetwork:
                 group[newID,:] = self.data[sampleID,:]
                 
                 
-            #deterine the 
+            #add group to folds, instance ID's to fold ID's 
             Folds.append(group)
+            self.FoldIDs.append(groupSamples)
         
         return Folds
+    
+    def nFoldStratifiedCrossValidation(self, fileName):
+        """
+        This is the top level function that performs a cross validation on the 
+        training set and writes the results to the file fileName
+        """
+        # the process of training the NN - testing the results saving the output
+        #must be completed n times - n being the number of folds
+        for fID, fold in enumerate(self.Folds):
+            folds = self.Folds[:] #make a shallow copy
+            testSet = folds.pop(fID)
+            trainingSet = merge(folds)
+            self.train(trainingSet)
+            results = self.test(testSet)
+            self.storeTestResults(results)
+     
+    def train(self, trainingSet):
+        """
+        
+        """
+        pass
+    
+    def test(self,testSet):
+        """
+        """
+        pass
+    
+    def storeTestResults(self,results):
+        """
+        """
+        pass
+        
+            
+            
+            
+        
         
                 
 #--------------------------- utility functions --------------------------------
@@ -157,7 +200,18 @@ def intSelect(decimal):
     integer = int(decimal) ; dec = decimal - integer
     return integer + randBin(dec)
     
+def merge(foldList):
+    """
+    input: list of np.arrays
+    output: a single np array with all of the contents of the arrays stacked 
+    ontop of one another
+    """
+    allFolds = np.array([])
+    for fold in foldList:
+        np.vstack(allFolds,fold)
+    return allFolds
         
+    
         
         
         
