@@ -55,8 +55,10 @@ class NeuralNetwork:
         #vectorized functions
         self.vSigmoid = np.vectorize(sigmoid)
         
-
-    
+        #results
+        self.results = []
+        
+        
     def importarff(self,fileName):
         """
         processes an input .arff file into a system matrix of the following format:
@@ -169,6 +171,7 @@ class NeuralNetwork:
             self.train(trainingSet)
             results = self.test(testSet)
             self.storeTestResults(results)
+            print('Fold ' + str(fID))
      
     def train(self, trainingSet):
         """
@@ -180,7 +183,7 @@ class NeuralNetwork:
             (implicit) state adjustment on W,u,b,c
         """
         #wipe system state clean with new random weights
-        self.initState(trainingSet)
+        self.initState()
         
         #perform e epochs of stochastic gradient decent 
         for epoch in range(self.nEpochs):
@@ -190,9 +193,9 @@ class NeuralNetwork:
             while len(instanceIDs) > 0:
                 
                 #make selections
+                miniBatchIDs = []
                 for selectID in range(self.miniBatchSize):
-                    miniBatchIDs = []
-                    if len(instanceIDs > 0):
+                    if len(instanceIDs) > 0:
                         popID = np.random.randint(0,len(instanceIDs))
                         selection = instanceIDs.pop(popID)
                         miniBatchIDs.append(selection)
@@ -212,7 +215,13 @@ class NeuralNetwork:
                     dW += _dW ; du += _du ; db += _db ; dc += _dc 
                     
                 #update weights at end of mini-batch
+                n  = float(self.miniBatchSize)
+                dW = dW/n ; du = du/n ; db += db/n ; dc = dc/n  #average (w/scalar division)
                 self.W += dW ; self.u += du ; self.b += db ; self.c += dc
+                
+                #store results  #check error on last entry in minibatch
+                self.results.append([epoch,self.crossEntropyError(self.o,x[-1])])
+                
 
         
            
@@ -220,11 +229,13 @@ class NeuralNetwork:
         """
         initialize the state of the neural network, i.e. all bias vectors and weights
         """
-        wScale = .01
-        self.W = np.random.normal(0,wScale,(self.nAttributes,self.nAttributes))
-        self.u = np.random.normal(0,wScale,(self.nAttributes,1))   #use u'
-        self.b = np.random.uniform(0,1,(self.nAttributes,1))  #what should be the scale on this??
-        self.c = np.random.uniform(0,1,(1,1))
+#        wScale = .3
+#        self.W = np.random.normal(0,wScale,(self.nAttributes,self.nAttributes))
+#        self.u = np.random.normal(0,wScale,(self.nAttributes,1)) 
+        self.W = np.random.uniform(-1,1,(self.nAttributes,self.nAttributes))
+        self.u = np.random.uniform(-1,1,(self.nAttributes,1))
+        self.b = np.random.uniform(-1,1,(self.nAttributes,1))  #what should be the scale on this??
+        self.c = np.random.uniform(-1,1,(1,1))
         
         self.h = np.zeros([self.nAttributes,1])
         self.o = np.zeros([1,1])
@@ -249,7 +260,9 @@ class NeuralNetwork:
         
         #perform forward propagation
         self.h = self.vSigmoid(np.matmul(self.W,x) + self.b)
-        self.y = self.vSigmoid(np.matmul(self.u.transpose(),self.h) + self.c)
+        self.o = self.vSigmoid(np.matmul(self.u.transpose(),self.h) + self.c)
+        
+        return self.o
         
     
     def backwardPropagation(self,x):  #slide 30
@@ -269,21 +282,39 @@ class NeuralNetwork:
         # delta_x -> partial derivative, denoted delta in slides
         # dx      -> small step in some weight or bias function
         
-        y  = x[-1]                             #parse y (output) from x
-        x = x[0:-1].reshape(x.size - 1 , 1)    #reshape x to column vect
-        delta_o = (y - self.o)                 #determine -pE_pnet = delta_o
-        dc = self.eta*delta_o                  #determine dc
-        du = self.eta * delta_o * self.h       #determine du
-        delta_h = delta_o * self.u             #deterine delta_h
-        db = self.eta*delta_h                  #determine db
-        dW = self.eta*np.matmul(np.diag(delta_h.transpose().squeeze()),x)
+        y  = x[-1]                                         #parse y (output) from x
+        x = x[0:-1].reshape(x.size - 1 , 1)                #reshape x to column vect
+        delta_o = (y - self.o)                             #determine -pE_pnet = delta_o
+        dc = self.eta*delta_o                              #determine dc
+        du = self.eta * delta_o * self.h                   #determine du
+        delta_h = delta_o * self.u * (self.h*(1-self.h))       #deterine delta_h
+        db = self.eta*delta_h                              #determine db
+        dh_mat = np.matmul(np.diag(delta_h.transpose().squeeze()),np.ones([self.nAttributes,self.nAttributes]))
+        dW = self.eta*np.matmul(dh_mat,np.diag(np.squeeze(x)))
         
         return dW,du,db,dc
         
+   
+    def crossEntropyError(self,o,y):
+        """
+        crossEntropyError is the loss function used in this implementation of a Neural Network
+        though only the derivatives are used in the computations for gradient decent, calculating
+        the error may give good indication of whether the optimization is progressing as
+        as epochs increase.
+        """
+        return -1*(y*np.log(o) + (1-y)*np.log(1-o))
     
+    
+    def printResults(self,nFold):
+        """
+        cost vs. epoch plot for particular fold
+        """
+
+  
         
     def test(self,testSet):
         """
+        using the trained
         """
         pass
     
@@ -321,9 +352,9 @@ def merge(foldList):
     output: a single np array with all of the contents of the arrays stacked 
     ontop of one another
     """
-    allFolds = np.array([])
+    allFolds = np.array([]).reshape(0,foldList[0].shape[1])  #get into the right shape!!
     for fold in foldList:
-        np.vstack(allFolds,fold)
+        allFolds = np.vstack((allFolds,fold))
     return allFolds
 
 def sigmoid(x):
@@ -331,18 +362,48 @@ def sigmoid(x):
     scalar sigmoid function
     """
     return  1/(1 + np.exp(-x))
-        
-    
+
 
 #------------------------ plotting functions ----------------------------------    
+      
+    
+#------------------------ test functions --------------------------------------
+tests = False
+import unittest
+#if tests:   
+#    nn = NeuralNetwork('xor.arff', nFolds = 3,eta = .5, nEpochs = 5000)
+#    nn.initState()
+##    nn.forwardPropagation(np.array([1,1,0]))
+##    nn.nFoldStratifiedCrossValidation('test')
+#    
 
+#
+#class TestNN(unittest.TestCase):
+#    def __init__(self):
+#        self.nn = NeuralNetwork('xor.arff', nFolds = 3,eta = .5, nEpochs = 5000)
+#    
+#    def testForwardProp(self):
+#        
+#        #set up matricies for xor
+#        self.nn.W = np.array([[1, -1],[-1, 1]])
+#        self.nn.b = np.array([[0,0]]).transpose()
+#        self.nn.u = np.array([1,1]).transpose()
+#        self.nn.c = np.array([[0]])
+#        
+#        #test the forward path for all xor fxns
+#        self.assertTrue(self.nn.forwardPropagation(np.array([1,1,0]) < .1 )
+#        self.assertTrue(self.nn.forwardPropagation(np.array([1,0,1]) > .9 )
+#        self.assertTrue(self.nn.forwardPropagation(np.array([0,1,1]) > .9 )
+#        self.assertTrue(self.nn.forwardPropagation(np.array([0,0,0]) < .1 )
+#      
 
 #---------------------------- debugging ---------------------------------------
 debug = True
 if debug:
-    nn = NeuralNetwork('xor.arff', nFolds = 2,eta = .5, nEpochs = 50)
+    nn = NeuralNetwork('xor.arff', nFolds = 3,eta = .5, nEpochs = 5000)
     nn.initState()
     nn.forwardPropagation(np.array([1,1,0]))
+    nn.nFoldStratifiedCrossValidation('test')
         
         
         
