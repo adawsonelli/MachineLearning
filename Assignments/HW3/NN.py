@@ -73,8 +73,8 @@ class NeuralNetwork:
         data = arff.load(open(fileName,'rb'))
         
         #extract class labels from arff data structure
-        CLs = data['attributes'][-1][1]
-        self.CLs = {CLs[0]:0, CLs[1]:1}  #lookup dict
+        self.CLInv = data['attributes'][-1][1]
+        self.CLs = {self.CLInv[0]:0, self.CLInv[1]:1}  #lookup dict
         
         #copy all data instances into an np array, including 0 and 1 for class labels
         nInstances =  len(data['data'])
@@ -169,9 +169,12 @@ class NeuralNetwork:
             testSet = folds.pop(fID)
             trainingSet = merge(folds)
             self.train(trainingSet)
-            results = self.test(testSet)
-            self.storeTestResults(results)
+            result = self.test(testSet,fID)
+            self.results.append(result)
             print('Fold ' + str(fID))
+        
+        #print the results of the nFold stratafied Cross Validation
+        self.printResults()
      
     def train(self, trainingSet):
         """
@@ -220,7 +223,7 @@ class NeuralNetwork:
                 self.W += dW ; self.u += du ; self.b += db ; self.c += dc
                 
                 #store results  #check error on last entry in minibatch
-                self.results.append([epoch,self.crossEntropyError(self.o,x[-1])])
+                #self.results.append([epoch,self.crossEntropyError(self.o,x[-1])])
                 
 
         
@@ -229,11 +232,11 @@ class NeuralNetwork:
         """
         initialize the state of the neural network, i.e. all bias vectors and weights
         """
-#        wScale = .3
-#        self.W = np.random.normal(0,wScale,(self.nAttributes,self.nAttributes))
-#        self.u = np.random.normal(0,wScale,(self.nAttributes,1)) 
-        self.W = np.random.uniform(-1,1,(self.nAttributes,self.nAttributes))
-        self.u = np.random.uniform(-1,1,(self.nAttributes,1))
+        wScale = .3
+        self.W = np.random.normal(0,wScale,(self.nAttributes,self.nAttributes))
+        self.u = np.random.normal(0,wScale,(self.nAttributes,1)) 
+#        self.W = np.random.uniform(-1,1,(self.nAttributes,self.nAttributes))
+#        self.u = np.random.uniform(-1,1,(self.nAttributes,1))
         self.b = np.random.uniform(-1,1,(self.nAttributes,1))  #what should be the scale on this??
         self.c = np.random.uniform(-1,1,(1,1))
         
@@ -305,26 +308,73 @@ class NeuralNetwork:
         return -1*(y*np.log(o) + (1-y)*np.log(1-o))
     
     
-    def printResults(self,nFold):
+    def printResults(self):
         """
-        cost vs. epoch plot for particular fold
+        prints the results of the cross validation to an output file 
         """
+        #setup file
+        f = open("output.txt",'w')  #write over existing file
+        f.write("output of nFold Stratified Cross-Validation \n")
+        f.write(" \n")
+        f.write("fold predicted ground truth confidence \n")
+        space = "    "
 
-  
+        #unscramble random values:
+        foldIDs = flatten(self.FoldIDs) 
+        results = flatten(self.results)
+        foldIDs = np.argsort(np.asarray(foldIDs))
         
-    def test(self,testSet):
+        #print in original order:
+        correct = 0
+        for ID in foldIDs:
+            instance = results[ID]
+            f.write(str(instance[0]) + space + str(instance[1]) + space +  str(instance[2]) + space + str(instance[3]) + '\n')
+            if instance[1] == instance[2]:
+                correct += 1
+        
+        #print % correct
+        f.write(" percent correctly classified: " + str(float(correct) / self.nInstances))
+            
+
+    def test(self,testSet,foldID):
         """
-        using the trained
+        using the trained NN, test each element in the testSet and store the results in a list
+        input: testSet - np.array
+        output: list - results
         """
-        pass
-    
-    def storeTestResults(self,results):
-        """
-        """
-        pass
+        foldResults = []
+        #loop over test set
+        for instance in testSet:  #instance is x!
+            y = instance[-1]
+            o = self.forwardPropagation(instance)
+            
+            #predict class with threashold 
+            if o < self.ClassThreashold: 
+                predictedClass =  0
+            else:
+                predictedClass =  1
+            predictedClass = self.CLInv[predictedClass]
+            
+            #result    foldID  predictedClass  actualClass         confidence / probability
+            iResult = [foldID, predictedClass, self.CLInv[int(y)], self.o[0,0] ]
+            
+            foldResults.append(iResult)
+            
+        return foldResults
+            
         
                            
 #--------------------------- utility functions --------------------------------
+
+def flatten(nestedList):
+    """
+    method for flattening nested lists
+    """
+    flattenedList = []
+    for sublist in nestedList:
+        for val in sublist:
+            flattenedList.append(val)
+    return flattenedList
 
 def randBin(prob):
     """
@@ -400,9 +450,10 @@ import unittest
 #---------------------------- debugging ---------------------------------------
 debug = True
 if debug:
-    nn = NeuralNetwork('xor.arff', nFolds = 3,eta = .5, nEpochs = 5000)
-    nn.initState()
-    nn.forwardPropagation(np.array([1,1,0]))
+    #nn = NeuralNetwork('xor.arff', nFolds = 3,eta = 1, nEpochs = 500)
+    nn = NeuralNetwork('sonar.arff', nFolds = 3,eta = 2, nEpochs = 50)
+    #nn.initState()
+    #nn.forwardPropagation(np.array([1,1,0]))
     nn.nFoldStratifiedCrossValidation('test')
         
         
