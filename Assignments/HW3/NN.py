@@ -157,7 +157,11 @@ class NeuralNetwork:
         
         return Folds
     
-    def nFoldStratifiedCrossValidation(self, fileName):
+    def CVwrapperForROCplot(self,threashold):
+        self.ClassThreashold = threashold
+        self.nFoldStratifiedCrossValidation()
+    
+    def nFoldStratifiedCrossValidation(self):
         """
         This is the top level function that performs a cross validation on the 
         training set and writes the results to the file fileName
@@ -324,16 +328,34 @@ class NeuralNetwork:
         results = flatten(self.results)
         foldIDs = np.argsort(np.asarray(foldIDs))
         
-        #print in original order:
-        correct = 0
+        #assess accuracy metrics
+        TP = 0 ; TN = 0
+        FP = 0 ; FN = 0
+        
+        #print in original order - handle classification of correct/ incorrect
         for ID in foldIDs:
             instance = results[ID]
             f.write(str(instance[0]) + space + str(instance[1]) + space +  str(instance[2]) + space + str(instance[3]) + '\n')
-            if instance[1] == instance[2]:
-                correct += 1
+            
+            #handle accuracy stuff
+            gt = instance[2] ; p = instance[1]   #ground truth, predicted
+            if   self.CLInv[1] == gt and gt == p:   #TP
+                TP += 1 
+            elif self.CLInv[0] == gt and gt == p:   #TN
+                TN += 1
+            elif self.CLInv[0] == gt and gt != p:   #FP
+                FP += 1
+            elif self.CLInv[1] == gt and gt != p:   #FN
+                FN +=1
+                
         
-        #print % correct
-        f.write(" percent correctly classified: " + str(float(correct) / self.nInstances))
+        #store accuracy metrics for plotting
+        self.accuracy = float(TP + FN) / self.nInstances
+        self.sensitivity = float(TP) / (TP + FN)
+        self.specificity = float(TN) / (TN + FP)
+    
+        #print accuracy
+        f.write(" percent correctly classified: " + str(self.accuracy))
             
 
     def test(self,testSet,foldID):
@@ -415,8 +437,90 @@ def sigmoid(x):
 
 
 #------------------------ plotting functions ----------------------------------    
-      
+#plotting functions for part B - analysis: 
+
+def plotAccuracyVsEpochs():
+    """
+    plots Accuracy Vs nEpochs
+    """
+    #perform numerical experiment
+    nEpochs = [ 25, 50, 75, 100]
+    accuracies = []
+    for epochs in nEpochs:
+        meanAcc = 0 ; nTrials = 1
+        for trial in range(nTrials):
+            nn = NeuralNetwork('sonar.arff', nFolds = 10, eta = .1, nEpochs = epochs)
+            nn.nFoldStratifiedCrossValidation()
+            meanAcc += nn.accuracy
+        
+        accuracies.append(float(meanAcc)/nTrials)
     
+    #plot
+    plt.plot(nEpochs,accuracies)
+    plt.ylabel('accuracy')
+    plt.xlabel('Epochs')
+    plt.title('prediction accuracy vs. num Epochs @ eta = .1, nfolds = 10')
+    plt.grid()
+    
+def plotAccuracyVsFolds():
+    """
+    plot accuracy vs n Folds
+    """
+    #perform numerical experiment
+    nFolds = [5, 10, 15, 20, 25]
+    accuracies = []
+    for folds in nFolds:
+        meanAcc = 0 ; nTrials = 1
+        for trial in range(nTrials):
+            nn = NeuralNetwork('sonar.arff', nFolds = folds, eta = .1, nEpochs = 50)
+            nn.nFoldStratifiedCrossValidation()
+            meanAcc += nn.accuracy
+        
+        accuracies.append(float(meanAcc)/nTrials)
+    
+    #plot
+    plt.plot(nFolds,accuracies)
+    plt.ylabel('accuracy')
+    plt.xlabel('nFolds')
+    plt.title('prediction accuracy vs. num nFolds @ eta = .1, nEpochs = 50')
+    plt.grid()
+    
+    
+    
+    
+def plotROC():
+    """
+    plot the ROC for the NN by varying threashold
+    """
+    threasholds = np.linspace(.01,.99,25)
+    TPs = [] ; FPs = []
+    for thr in threasholds:
+        nn = NeuralNetwork('sonar.arff', nFolds = 10, eta = .1, nEpochs = 50)
+        nn.CVwrapperForROCplot(thr)
+        TPs.append(nn.sensitivity)
+        FPs.append(1- nn.specificity)
+    
+    #plot 
+    plt.plot(FPs,TPs,'ro')
+    plt.plot([0,1],[0,1],'--')# y = x
+    plt.ylabel('False Positive Rate')
+    plt.xlabel('True Positive Rate')
+    plt.title('ROC for sonar.arff , nFolds = 10, eta = .1, nEpochs = 50')
+    plt.grid()
+    
+        
+#------------------------ grading function ------------------------------------
+def grading(trainfile, num_folds, learning_rate,num_epochs ):
+    """
+    function that gets run from the command line for grading 
+    """
+    nn = NeuralNetwork(trainfile, nFolds = num_folds, eta = learning_rate, nEpochs = num_epochs)
+    nn.nFoldStratifiedCrossValidation()
+    
+    
+
+
+   
 #------------------------ test functions --------------------------------------
 tests = False
 import unittest
@@ -448,13 +552,13 @@ import unittest
 #      
 
 #---------------------------- debugging ---------------------------------------
-debug = True
+debug = False
 if debug:
-    #nn = NeuralNetwork('xor.arff', nFolds = 3,eta = 1, nEpochs = 500)
-    nn = NeuralNetwork('sonar.arff', nFolds = 3,eta = 2, nEpochs = 50)
+    nn = NeuralNetwork('xor.arff', nFolds = 3,eta = 1, nEpochs = 500)
+    #nn = NeuralNetwork('sonar.arff', nFolds = 10,eta = .1, nEpochs = 50)
     #nn.initState()
     #nn.forwardPropagation(np.array([1,1,0]))
-    nn.nFoldStratifiedCrossValidation('test')
+    #nn.nFoldStratifiedCrossValidation()
         
         
         
