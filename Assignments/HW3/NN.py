@@ -57,6 +57,7 @@ class NeuralNetwork:
         
         #results
         self.results = []
+         
         
         
     def importarff(self,fileName):
