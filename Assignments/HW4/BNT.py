@@ -25,21 +25,22 @@ class NaiveBayes():
         self.nAttributes = self.data.shape[1] -1 #doesn't include CL
         self.nClasses = len(self.atr['names'][-1])    #should always be 2
         
-        #train probabilities:                                         #http://www.saedsayad.com/naive_bayesian.htm
-        self.classInstances , self.classProbs = self.train("class")   #Class Prior Probability and instances
-        self.conditionalProbs = self.train("conditionalProbs")        #conditional probabilities
-        self.atrProbs = self.train("PredictorPrior")                             #predictor prior probabilities
+        #train probabilities:                                                #http://www.saedsayad.com/naive_bayesian.htm
+        self.classInstances , self.classPriors = self.train("classPriors")   #Class Prior Probability and instances
+        self.likelyhoods = self.train("likelyhoods")                         #conditional probabilities
+        self.predictorPrior = self.train("predictorPrior")                   #predictor prior probabilities
     
     def train(self,Tset):
         """
         train a naive bayes classifier - both class probabilites and atrProbs
         structure: 
-            self.classProbs     = np.array[1,2]
-            self.classInstances = np.array[1,2]
-            self.class 
+            self.classPriors     = np.array[1,2]
+            self.classInstances  = np.array[1,2]
+            self.likelyhoods = [nHyp][nAttributes][nChoices] (nChoices will vary by atr)
+			self.predictorPrior =    [nAttributes][nChoices]
         """
-        # train class probabilities: P(O = T) and P(O = F)
-        if Tset == "class":  #assumes binary classification problem
+        # train class prior probabilities: P(O = T) and P(O = F)
+        if Tset == "classPriors":  #assumes binary classification problem
             
             #count class instances:
             classInstances = np.zeros([1,2])  # [posCount ,negCount]
@@ -50,17 +51,16 @@ class NaiveBayes():
                     classInstances[0,1] += 1
             
             # calculate class probabilities (using laplace correction)
-            classProbs = np.zeros([1,2])
+            classPriors = np.zeros([1,2])
             for ID, CI in enumerate(classInstances):
-                classProbs[0,ID] = float(classInstances[0,ID] + 1) / (self.nInstances + self.nClasses)
+                classPriors[0,ID] = float(classInstances[0,ID] + 1) / (self.nInstances + self.nClasses)
                 
-            return classInstances, classProbs
+            return classInstances, classPriors
         
-        #train attribute conditional probabilites
-        #output is:  self.conditionalProbs[hypID][atrID][choiceID] == dim([2][nAttributes][nChoices])
-        elif Tset == "conditionalProbs":
+        #train likelyhoods P(A_n | Y)
+        elif Tset == "likelyhoods":
             
-            hypProbs = []  # [1x2]
+            likelyhoods = []  # [1x2]
             for outputClass in range(self.nClasses):  #binary classification for now
                 #calculate counts(A_n and Y):
                 P_AnY = []
@@ -78,12 +78,11 @@ class NaiveBayes():
                         #assemble lists:
                         atrProbs.append(P)
                     P_AnY.append(atrProbs)
-                hypProbs.append(P_AnY)
-            return hypProbs
+                likelyhoods.append(P_AnY)
+            return likelyhoods 
         
         #train predictor prior probabilities
-        #output is self.atrProbs[atrID][choiceID]
-        elif Tset == "PredictorPrior":
+        elif Tset == "predictorPrior":
             Ppriors = []
             for atrID, attribute in enumerate(self.atr['DC']):
                 nChoices = len(attribute)
@@ -123,7 +122,7 @@ class NaiveBayes():
             for atrID,choice in enumerate(x):
                 P = P*self.atrProbs[hyp][atrID][int(choice)]
             #factor in P(h)
-            P = P*self.classProbs[0,hyp]
+            P = P*self.classPriors[0,hyp]
             
             #add to list
             posteriors.append(P)
