@@ -37,23 +37,23 @@ class NaiveBayes():
             self.classPriors     = np.array[1,2]
             self.classInstances  = np.array[1,2]
             self.likelyhoods = [nHyp][nAttributes][nChoices] (nChoices will vary by atr)
-			self.predictorPrior =    [nAttributes][nChoices]
+			  self.predictorPrior =   [nAttributes][nChoices]
         """
         # train class prior probabilities: P(O = T) and P(O = F)
         if Tset == "classPriors":  #assumes binary classification problem
             
             #count class instances:
-            classInstances = np.zeros([1,2])  # [posCount ,negCount]
+            classInstances = np.zeros([2])  # [posCount ,negCount]
             for instance in self.data: 
                 if instance[-1] == 0: #pos
-                    classInstances[0,0] += 1
+                    classInstances[0] += 1
                 elif instance[-1] == 1: #neg
-                    classInstances[0,1] += 1
+                    classInstances[1] += 1
             
             # calculate class probabilities (using laplace correction)
-            classPriors = np.zeros([1,2])
+            classPriors = np.zeros([2])
             for ID, CI in enumerate(classInstances):
-                classPriors[0,ID] = float(classInstances[0,ID] + 1) / (self.nInstances + self.nClasses)
+                classPriors[ID] = float(classInstances[ID] + 1) / (self.nInstances + self.nClasses)
                 
             return classInstances, classPriors
         
@@ -67,14 +67,14 @@ class NaiveBayes():
                 for atrID, attribute in enumerate(self.atr['DC']):
                     nChoices = len(attribute)
                     atrProbs = []
-                    for  choice in attribute:
+                    for choice in attribute:
                         count = 0
                         #loop over data and count instances:
                         for instance in self.data:
                             if (instance[atrID] == choice) and instance[-1] == outputClass:
                                 count += 1
                         #calculate attribute probability:
-                        P = float(count + 1) / (self.classInstances[0,outputClass] + nChoices )
+                        P = float(count + 1) / (self.classInstances[outputClass] + nChoices )
                         #assemble lists:
                         atrProbs.append(P)
                     P_AnY.append(atrProbs)
@@ -99,8 +99,24 @@ class NaiveBayes():
                     atrProbs.append(P)
                 Ppriors.append(atrProbs)
             return Ppriors
-            
-            
+    
+    def priorCheck(self):
+        """
+        check that that weighted sum of the likelyhoods leads to the predictor prior
+        """
+        priorCheck = []
+        #calculate with weighted sum of likelyhoods
+        atrProbs = []
+        for atrID, atr in enumerate(self.predictorPrior):
+            choiceProbs = []
+            for choiceID, choice in enumerate(atr):
+                p = self.likelyhoods[0][atrID][choiceID] * self.classPriors[0] +  \
+                    self.likelyhoods[1][atrID][choiceID] * self.classPriors[1]
+                choiceProbs.append(p)
+            atrProbs.append(choiceProbs)
+        return atrProbs
+                    
+        
             
         
     def predictInstance(self,x):
@@ -113,33 +129,66 @@ class NaiveBayes():
         #trim off class label:
         x = x[0:-1]
         
-        #generated predicted probabilities for each class:
+        #solve for the Predictor Prior Probability for x:
+        Px = 1
+        for atrID,choice in enumerate(x):
+            Px = Px * self.predictorPrior[atrID][int(choice)]
+            
+        #generate posterior probabilities for each class:
         posteriors = []
         outputClasses = [0,1]
+        
         for hyp in outputClasses: #select h
-            P = 1
+            P = 1.0
             #p(x | h) = p(d1 | h) * p(d_2 | h ) * ... p(d_n | h )
             for atrID,choice in enumerate(x):
-                P = P*self.atrProbs[hyp][atrID][int(choice)]
-            #factor in P(h)
-            P = P*self.classPriors[0,hyp]
+                P = P*self.likelyhoods[hyp][atrID][int(choice)]
+            #solve for posterior
+            P = (P*self.classPriors[hyp]) / Px
             
             #add to list
             posteriors.append(P)
         
+        
+        # normalize to sum of 
+        posteriors = [posteriors[0] / sum(posteriors) , posteriors[1] / sum(posteriors)]
+        
         #select largest probability class:
         if posteriors[0] >= posteriors[1]: ind = 0
         else: ind = 1
-                
-            
         
         return outputClasses[ind], posteriors[ind]
-        pass
-    def test(fileName):
+    
+    
+    def test(self, fileName):
         """
         read in an input test file, and print out 
         """
-        pass
+        #process input file
+        data, atr = importarff(fileName)
+        
+        #print header
+        
+        #setup output file
+        f = open("output.txt",'w')  #write over existing file
+        #f.write("output of nFold Stratified Cross-Validation \n")
+        #f.write(" \n")
+        #f.write("fold predicted ground truth confidence \n")
+        space = "    "
+        
+        #make prediction based on training data:
+        for x in data:
+            CL, postProb = self.predictInstance(x)
+            
+            CLNames = self.atr['names'][-1][1]
+            groundTruth = CLNames[int(x[-1])]  ; predicted = CLNames[CL]
+            f.write(str(predicted) + space + str(groundTruth) + space +  str(postProb) + "\n")
+        
+        #close file
+        f.close()
+            
+            
+        
     
 
 class TAN():
@@ -204,3 +253,4 @@ def importarff(fileName):
 #---------------------------- grading -----------------------------------------
 #---------------------------- debugging ---------------------------------------
 nb = NaiveBayes('vote_train.arff')
+nb.predictInstance(data[0,:])
