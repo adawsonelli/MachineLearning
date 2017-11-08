@@ -195,7 +195,72 @@ class TAN():
     """
     implementation of a TAN (tree-augmented naive Bayes) binary classifier
     """
-    pass
+    def __init__(self, fileName):
+        """
+        inputs:fileName of training set data
+        """
+        self.nb = NaiveBayes(fileName)  #Naive bayes instance - composition
+        self.data , self.atr = importarff(fileName)
+        
+    def I(self, xi, xj):
+        """
+        Conditional Mutual Information - used to assess degree to which two features are 
+        dependent
+        inputs:
+            xi - index of i_th feature
+            xj - index of j_th feature
+        outputs: 
+            CMI - float defining Conditional Mutual Information
+        """
+        #setup variables for sumation
+        CMI = 0 ; P = self.P ; yID = self.nb.nAttributes  #could be plus one??
+        for y in self.atr['DC'][yID]:
+            for ci in self.atr['DC'][xi]:          #choice i
+                for cj in self.atr['DC'][xj]:      #choice j
+                    CMI += P([(xi,ci),(xj,cj), (yID,y)]) *  \
+                   np.log2(P([(xi,ci),(xj,cj)],[(yID,y)])/(P[(xi,ci)],[(yID,y)])*P([(xj,cj)],[(yID,y)]))
+        return CMI
+    
+    
+    def P(self,X,Y = []):
+        """
+        determine the conditional probability P(X|Y) from the training dataset
+        with laplacian corrections
+        inputs:
+            X: list of feature ID - choice tuples connected by & relationship
+            Y: list of feature ID - choice tuples that the probability is conditioned on
+        example:  
+            x1 is feature ID , c1 is choice ID
+            P([(x1,c0),(x7,c1)] ,[(YID,c0),(x4,c4)])
+        """
+        #generate counts for num and den of probability
+        num = 0 ; den = 0 
+        for instance in self.data:
+            
+            #handle numerator increment - only increment if all conditions met
+            ni = 1
+            for feature in X: ni = ni and (instance[feature[0]] == feature[1])  
+            for feature in Y: ni = ni and (instance[feature[0]] == feature[1])
+            if ni: num += 1
+            
+            #handle denominator increment only if conditional contributions met
+            di = 1
+            for feature in Y: di = di and (instance[feature[0]] == feature[1])
+            if di: den += 1
+        
+        #handle laplacian correction
+        sumChoices = 0 
+        for feature in X: sumChoices += len(self.atr['DC'][feature[0]]) 
+        P = float(num + len(X)) / (den + sumChoices)
+        
+        return P
+            
+            
+        
+        
+        
+        
+        
 
 #---------------------------- utility -----------------------------------------
 def importarff(fileName):
@@ -257,3 +322,8 @@ nb = NaiveBayes('lymph_train.arff')
 nb.predictInstance(nb.data[0,:])
 #nb = NaiveBayes('weatherDiscrete.arff')
 #nb.predictInstance(nb.data[0,:])    
+tan = TAN('lymph_train.arff')
+
+#tan tests:
+tan.P([(tan.nb.nAttributes , 0)], [])
+tan.P([(0 , 0)], [(tan.nb.nAttributes , 0)])
