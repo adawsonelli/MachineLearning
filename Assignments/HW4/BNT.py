@@ -43,11 +43,11 @@ class NaiveBayes():
         if Tset == "classPriors":  #assumes binary classification problem
             
             #count class instances:
-            classInstances = np.zeros([2])  # [posCount ,negCount]
+            classInstances = np.zeros([2])  # [negCount ,posCount]
             for instance in self.data: 
-                if instance[-1] == 0: #pos
+                if instance[-1] == 0: #neg
                     classInstances[0] += 1
-                elif instance[-1] == 1: #neg
+                elif instance[-1] == 1: #pos
                     classInstances[1] += 1
             
             # calculate class probabilities (using laplace correction)
@@ -252,5 +252,8 @@ def importarff(fileName):
 
 #---------------------------- grading -----------------------------------------
 #---------------------------- debugging ---------------------------------------
-nb = NaiveBayes('vote_train.arff')
-nb.predictInstance(data[0,:])
+#nb = NaiveBayes('vote_train.arff')
+nb = NaiveBayes('lymph_train.arff')
+nb.predictInstance(nb.data[0,:])
+#nb = NaiveBayes('weatherDiscrete.arff')
+#nb.predictInstance(nb.data[0,:])    
