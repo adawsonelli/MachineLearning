@@ -201,6 +201,7 @@ class TAN():
         """
         self.nb = NaiveBayes(fileName)  #Naive bayes instance - composition
         self.data , self.atr = importarff(fileName)
+        self.root = self.primGrowTree()
         
     def I(self, xi, xj):
         """
@@ -218,7 +219,7 @@ class TAN():
             for ci in self.atr['DC'][xi]:          #choice i
                 for cj in self.atr['DC'][xj]:      #choice j
                     CMI += P([(xi,ci),(xj,cj), (yID,y)]) *  \
-                   np.log2(P([(xi,ci),(xj,cj)],[(yID,y)])/(P[(xi,ci)],[(yID,y)])*P([(xj,cj)],[(yID,y)]))
+                   np.log2(P([(xi,ci),(xj,cj)],[(yID,y)])/(P([(xi,ci)],[(yID,y)])*P([(xj,cj)],[(yID,y)])))
         return CMI
     
     
@@ -254,8 +255,79 @@ class TAN():
         P = float(num + len(X)) / (den + sumChoices)
         
         return P
+    
+    def primGrowTree(self):
+        """
+        grow a Maximal Spanning Tree (MST) using prims algorithm, and CMI as
+        a metric for connection strength
+        """
+        #utility fxns
+        def popNode(nodeList,nID): 
+            """returns and removes node from list""" 
+            for ID, node in enumerate(nodeList):
+                if node.ID == nID:
+                    return nodeList.pop(ID)
+        def getNode(nodeList,nID): 
+            """returns node without removing from list"""
+            for ID, node in enumerate(nodeList):
+                if node.ID == nID:
+                    return node
+                
+        
+        #form node for each feature, not including Class Label
+        free = [] ; network = []
+        for fID in range(self.nb.nAttributes):
+            free.append(node(fID))
+        
+        #establish first feature as root
+        root = popNode(free, 0)
+        network.append(root)
+        
+        
+        #grow tree:
+        growTree = True
+        while growTree:
+            #break condition:
+            if len(network) == self.nb.nAttributes: growTree = False ; break
             
+            CMImx = 0 ; nNodeID = -1; fNodeID = -1
+            for nNode in network:
+                for fNode in free:
+                    if self.I(nNode.ID,fNode.ID) > CMImx:  #this should handle tie breaking criteria natively!
+                        CMImx = self.I(nNode.ID,fNode.ID)
+                        nNodeID = nNode.ID 
+                        fNodeID = fNode.ID
+            #add best node to network
+            fBest = popNode(free,fNodeID)
+            nBest = getNode(network,nNodeID)
+            nBest.next.append(fBest)
+            network.append(fBest)
             
+        return root
+        
+            
+        
+            
+class node():
+    """
+    prim algorithm node for forming a-cylic graph
+    """
+    def __init__(self,ID):
+        self.ID = ID         #ID number, aka feature number
+        self.next = []
+        self.inNetwork = False
+    
+    def cprint(self,ntabs = 0):
+        """
+        print tree struct to console for viewing
+        """
+        tab = "|    "
+        print(ntabs*tab  +  str(self.ID) + '\n'),
+        if self.next == [] : return 
+        
+        for node in self.next:
+            node.cprint(ntabs + 1)
+
         
         
         
@@ -321,8 +393,10 @@ def importarff(fileName):
 nb = NaiveBayes('lymph_train.arff')
 nb.predictInstance(nb.data[0,:])
 #nb = NaiveBayes('weatherDiscrete.arff')
-#nb.predictInstance(nb.data[0,:])    
-tan = TAN('lymph_train.arff')
+#nb.predictInstance(nb.data[0,:]) 
+tan = TAN('vote_train.arff')   
+#tan = TAN('lymph_train.arff')
+#tan = TAN('weatherDiscrete.arff')
 
 #tan tests:
 tan.P([(tan.nb.nAttributes , 0)], [])
