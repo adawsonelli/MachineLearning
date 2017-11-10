@@ -15,12 +15,20 @@ class NaiveBayes():
     """
     implementation of a naiveBayes binary classifier
     """
-    def __init__(self, fileName):
+    def __init__(self, fileName, dataArray = None):
         """
         inputs: fileName of training set data file
         """
+        #handle instantiation with sub-array of data
+        if dataArray != None:
+            self.data = dataArray
+            garbage , self.atr = importarff(fileName)
+        
+        #handle fileName instantiation
+        if dataArray == None:
+            self.data , self.atr = importarff(fileName)
+        
         #process data  input file:
-        self.data , self.atr = importarff(fileName)
         self.nInstances = self.data.shape[0]
         self.nAttributes = self.data.shape[1] -1 #doesn't include CL
         self.nClasses = len(self.atr['names'][-1])    #should always be 2
@@ -104,7 +112,6 @@ class NaiveBayes():
         """
         check that that weighted sum of the likelyhoods leads to the predictor prior
         """
-        priorCheck = []
         #calculate with weighted sum of likelyhoods
         atrProbs = []
         for atrID, atr in enumerate(self.predictorPrior):
@@ -198,7 +205,16 @@ class NaiveBayes():
         #close file
         f.close()
         
-    def cvTest(self)
+    def cvTest(self,testData):
+        """
+        returns accuracy for cross validation
+        """
+        correct = 0
+        for x in testData:
+            CL, postProb = self.predictInstance(x)
+            if CL == x[-1]: 
+                correct += 1
+        return float(correct) / testData.shape[1]
             
             
         
@@ -208,12 +224,20 @@ class TAN():
     """
     implementation of a TAN (tree-augmented naive Bayes) binary classifier
     """
-    def __init__(self, fileName):
+    def __init__(self, fileName, dataArray = None):
         """
         inputs:fileName of training set data
         """
-        self.nb = NaiveBayes(fileName)  #Naive bayes instance - composition
-        self.data , self.atr = importarff(fileName)
+        #handle instantiation with sub-array of data
+        if dataArray != None:
+            self.data = dataArray
+            garbage , self.atr = importarff(fileName)
+        
+        #handle fileName instantiation
+        if dataArray == None:
+            self.data , self.atr = importarff(fileName)
+        
+        self.nb = NaiveBayes(fileName,dataArray)  #Naive bayes instance - composition
         self.root = self.primGrowTree()
         
     def I(self, xi, xj):
@@ -424,6 +448,21 @@ class TAN():
         #close file
         f.close()
     
+    def cvTest(self,testData):
+        """
+        returns accuracy for cross validation
+        """
+        correct = 0
+        for x in testData:
+            CL, postProb = self.predictInstance(x)
+            if CL == x[-1]: 
+                correct += 1
+        return float(correct) / testData.shape[1]
+            
+            
+        
+    
+    
         
 class node():
     """
@@ -526,6 +565,7 @@ def crossValidationPlot(fileName):
     perform a 10-fold cross validation on the specified file with both naive bayes
     and TAN algorithms, and output model accuracy 
     """
+    
 #---------------------------- grading -----------------------------------------
 def grading(trainFile,testFile, learningMethod):
     """
