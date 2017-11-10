@@ -166,26 +166,39 @@ class NaiveBayes():
         """
         #process input file
         data, atr = importarff(fileName)
-        
-        #print header
-        
+     
         #setup output file
         f = open("output.txt",'w')  #write over existing file
-        #f.write("output of nFold Stratified Cross-Validation \n")
-        #f.write(" \n")
-        #f.write("fold predicted ground truth confidence \n")
-        space = "    "
+        space = " "
         
-        #make prediction based on training data:
+        #print header
+        CLid = len(self.atr['names']) - 1
+        for ID, name in enumerate(self.atr['names']):
+            if ID != CLid:
+                f.write(name[0] + space + "class" + "\n")
+        
+        #make space
+        f.write(" \n")
+        
+        #make prediction based on training data and print
+        correct = 0
         for x in data:
             CL, postProb = self.predictInstance(x)
             
             CLNames = self.atr['names'][-1][1]
             groundTruth = CLNames[int(x[-1])]  ; predicted = CLNames[CL]
             f.write(str(predicted) + space + str(groundTruth) + space +  str(postProb) + "\n")
+            
+            if groundTruth == predicted: 
+                correct += 1
         
+        #print number of correct classifications
+        f.write("\n")
+        f.write(str(correct))
         #close file
         f.close()
+        
+    def cvTest(self)
             
             
         
@@ -214,7 +227,7 @@ class TAN():
             CMI - float defining Conditional Mutual Information
         """
         #setup variables for sumation
-        CMI = 0 ; P = self.P ; yID = self.nb.nAttributes  #could be plus one??
+        CMI = 0 ; P = self.P ; yID = self.nb.nAttributes 
         for y in self.atr['DC'][yID]:
             for ci in self.atr['DC'][xi]:          #choice i
                 for cj in self.atr['DC'][xj]:      #choice j
@@ -250,9 +263,12 @@ class TAN():
             if di: den += 1
         
         #handle laplacian correction
-        sumChoices = 0 
-        for feature in X: sumChoices += len(self.atr['DC'][feature[0]]) 
-        P = float(num + len(X)) / (den + sumChoices)
+        xsumChoices = 0 ; ysumChoices = 0 
+        for feature in X: xsumChoices += len(self.atr['DC'][feature[0]])
+        #P = float(num + len(X)) / (den + sumChoices)
+        #P = float(num + len(X)) / (den + xsumChoices)
+        P = float(num + 1) / (den + xsumChoices)
+        #P = float(num + 1) / (den + len(self.atr['DC'][X[0][0]]))  ## correct laplacian correction to agree with outputs
         
         return P
     
@@ -304,10 +320,111 @@ class TAN():
             network.append(fBest)
             
         return root
-        
+    
+    def mostImportantDependency(self,fID):
+        """
+        Determine the most important dependancy of the feature specified by fID
+        using the tree located at self.root
+        inputs:
+            fID -[int] ID of the feature who's MID you are trying to find
+        outputs:
+            pID -[int] ID of the parent of the requested feature. if root, return
+            None
+        """
+        if fID == 0: #handle root:
+            return None
+        return self.root.returnParent(fID)
             
-        
+
             
+    def predictInstance(self,x):
+        """
+        use trained TAN classifier to predict the class of an input
+        instance
+        input: 1d np.array vector
+        outputs: predictedClass, probability
+        """
+        #trim off class label and prep
+        x = x[0:-1] ; posteriors = [] ; outputClasses = [0,1] ; yID = self.nb.nAttributes
+        
+        # calculate posterior probabilities
+        for hyp in outputClasses: 
+            P = 1.0
+            #p(x | h) = p(d1 | h) * p(d_2 | h ) * ... p(d_n | h )
+            for atrID,choice in enumerate(x):
+                #form conditional probability expressions
+                X = [(atrID,choice)]
+                Y = [(yID,hyp)]
+                #add most important condition to Y
+                depID = self.mostImportantDependency(atrID)
+                if depID != None:
+                    Y.append((depID,x[depID]))
+                
+                #calculate
+                P = P*self.P(X,Y)
+            
+            #solve for posterior
+            P = (P*self.nb.classPriors[hyp])
+            
+            #add to list
+            posteriors.append(P)
+        
+        
+        # normalize poseterior probabilities
+        posteriors = [posteriors[0] / sum(posteriors) , posteriors[1] / sum(posteriors)]
+        
+        #select largest probability class
+        if posteriors[0] >= posteriors[1]: ind = 0
+        else: ind = 1
+        
+        return outputClasses[ind], posteriors[ind]
+    
+    
+    def test(self, fileName):
+        """
+        read in an input test file, and print out 
+        """
+        #process input file
+        data, atr = importarff(fileName)
+        
+        #setup output file
+        f = open("output.txt",'w')  #write over existing file
+        space = " "
+        
+        #print header
+        CLid = len(self.atr['names']) - 1
+        for ID, name in enumerate(self.atr['names']):
+            if ID == 0: #root
+                f.write(name[0] + space + "class" + "\n")
+                
+            elif ID != CLid:
+                parentID =  self.mostImportantDependency(ID)
+                parentName = self.atr['names'][parentID][0]
+                f.write(name[0] + space + parentName + space + "class" + "\n")
+        
+        #make space
+        f.write(" \n")
+        
+        #make prediction based on training data:
+        correct = 0
+        for x in data:
+            CL, postProb = self.predictInstance(x)
+            
+            CLNames = self.atr['names'][-1][1]
+            groundTruth = CLNames[int(x[-1])]  ; predicted = CLNames[CL]
+            f.write(str(predicted) + space + str(groundTruth) + space +  str(postProb) + "\n")
+            
+            if groundTruth == predicted: 
+                correct += 1
+                
+        #print number of correct classifications
+        f.write("\n")
+        f.write(str(correct))
+        
+        #close file
+        f.close()
+    
+        
 class node():
     """
     prim algorithm node for forming a-cylic graph
@@ -327,13 +444,31 @@ class node():
         
         for node in self.next:
             node.cprint(ntabs + 1)
+    
+    def returnParent(self,childID):
+        """
+        search dependency tree and return parent of requested child 
+        """
+        if self.next == []:
+            return 0
+        
+        parent = False
+        for child in self.next:
+            if child.ID == childID:
+                parent == True
+                return self.ID
+       
+        
+        if not parent:
+            for child in self.next:
+                ID = child.returnParent(childID)
+                if  ID != 0:
+                    return ID
+            return 0
+        
 
         
         
-        
-        
-        
-
 #---------------------------- utility -----------------------------------------
 def importarff(fileName):
     """
@@ -386,18 +521,29 @@ def importarff(fileName):
     return dataMat , atr
                     
 #---------------------------- plotting ----------------------------------------
-
+def crossValidationPlot(fileName):
+    """
+    perform a 10-fold cross validation on the specified file with both naive bayes
+    and TAN algorithms, and output model accuracy 
+    """
 #---------------------------- grading -----------------------------------------
+def grading(trainFile,testFile, learningMethod):
+    """
+    called from the command line for grading purposes
+    """
+    if learningMethod == "n":
+        nb = NaiveBayes(trainFile)
+        nb.test(testFile)
+    elif learningMethod == "t":
+        tan = TAN(trainFile)
+        tan.test(trainFile)
+    
 #---------------------------- debugging ---------------------------------------
 #nb = NaiveBayes('vote_train.arff')
-nb = NaiveBayes('lymph_train.arff')
-nb.predictInstance(nb.data[0,:])
-#nb = NaiveBayes('weatherDiscrete.arff')
-#nb.predictInstance(nb.data[0,:]) 
-tan = TAN('vote_train.arff')   
-#tan = TAN('lymph_train.arff')
-#tan = TAN('weatherDiscrete.arff')
+#nb = NaiveBayes('lymph_train.arff')
 
-#tan tests:
-tan.P([(tan.nb.nAttributes , 0)], [])
-tan.P([(0 , 0)], [(tan.nb.nAttributes , 0)])
+#tan = TAN('vote_train.arff')
+tan = TAN('lymph_train.arff')   
+
+
+
