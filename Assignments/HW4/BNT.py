@@ -312,7 +312,23 @@ class TAN():
             for ID, node in enumerate(nodeList):
                 if node.ID == nID:
                     return node
+        
+        def sortNodeList(nodeList):
+            """
+            perfroms in place selection sort of  a nodeList
+            """
+            for sortedID, node in enumerate(nodeList):
+                minVal = nodeList[sortedID].ID
+                minID = sortedID
+                for entryID in range(sortedID,len(nodeList)):
+                    if nodeList[entryID].ID < minVal:
+                        minVal = nodeList[entryID].ID
+                        minID = entryID
                 
+                #swap items:
+                nodeList[sortedID], nodeList[minID] = nodeList[minID], nodeList[sortedID]
+            #return nodeList
+
         
         #form node for each feature, not including Class Label
         free = [] ; network = []
@@ -342,6 +358,7 @@ class TAN():
             nBest = getNode(network,nNodeID)
             nBest.next.append(fBest)
             network.append(fBest)
+            sortNodeList(network)                         #ensure correct order of network for tiebreaks
             
         return root
     
@@ -577,6 +594,7 @@ def grading(trainFile,testFile, learningMethod):
     elif learningMethod == "t":
         tan = TAN(trainFile)
         tan.test(trainFile)
+        
     
 #---------------------------- debugging ---------------------------------------
 #nb = NaiveBayes('vote_train.arff')
