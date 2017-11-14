@@ -255,7 +255,7 @@ class TAN():
         for y in self.atr['DC'][yID]:
             for ci in self.atr['DC'][xi]:          #choice i
                 for cj in self.atr['DC'][xj]:      #choice j
-                    CMI += P([(xi,ci),(xj,cj), (yID,y)]) *  \
+                    CMI += P([(xi,ci),(xj,cj),(yID,y)]) *  \
                    np.log2(P([(xi,ci),(xj,cj)],[(yID,y)])/(P([(xi,ci)],[(yID,y)])*P([(xj,cj)],[(yID,y)])))
         return CMI
     
@@ -287,12 +287,9 @@ class TAN():
             if di: den += 1
         
         #handle laplacian correction
-        xsumChoices = 0 ; ysumChoices = 0 
-        for feature in X: xsumChoices += len(self.atr['DC'][feature[0]])
-        #P = float(num + len(X)) / (den + sumChoices)
-        #P = float(num + len(X)) / (den + xsumChoices)
-        P = float(num + 1) / (den + xsumChoices)
-        #P = float(num + 1) / (den + len(self.atr['DC'][X[0][0]]))  ## correct laplacian correction to agree with outputs
+        xChoiceProducts = 1
+        for feature in X: xChoiceProducts = xChoiceProducts * len(self.atr['DC'][feature[0]])
+        P = float(num + 1) / (den + xChoiceProducts)
         
         return P
     
@@ -597,11 +594,12 @@ def grading(trainFile,testFile, learningMethod):
         
     
 #---------------------------- debugging ---------------------------------------
-#nb = NaiveBayes('vote_train.arff')
+nb = NaiveBayes('vote_train.arff')
 #nb = NaiveBayes('lymph_train.arff')
 
-#tan = TAN('vote_train.arff')
-tan = TAN('lymph_train.arff')   
+tan = TAN('vote_train.arff')
+#tan = TAN('lymph_train.arff')  
+#tan.P([(13,6)],[(0,2),(18,0)]) 
 
 
 
