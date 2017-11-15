@@ -20,12 +20,12 @@ class NaiveBayes():
         inputs: fileName of training set data file
         """
         #handle instantiation with sub-array of data
-        if dataArray != None:
+        if type(dataArray) != None:
             self.data = dataArray
             garbage , self.atr = importarff(fileName)
         
         #handle fileName instantiation
-        if dataArray == None:
+        if type(dataArray) == None:
             self.data , self.atr = importarff(fileName)
         
         #process data  input file:
@@ -229,12 +229,12 @@ class TAN():
         inputs:fileName of training set data
         """
         #handle instantiation with sub-array of data
-        if dataArray != None:
+        if type(dataArray) != None:
             self.data = dataArray
             garbage , self.atr = importarff(fileName)
         
         #handle fileName instantiation
-        if dataArray == None:
+        if type(dataArray) == None:
             self.data , self.atr = importarff(fileName)
         
         self.nb = NaiveBayes(fileName,dataArray)  #Naive bayes instance - composition
@@ -473,10 +473,7 @@ class TAN():
                 correct += 1
         return float(correct) / testData.shape[1]
             
-            
-        
-    
-    
+              
         
 class node():
     """
@@ -572,14 +569,125 @@ def importarff(fileName):
     
             
     return dataMat , atr
-                    
+
+
+              
 #---------------------------- plotting ----------------------------------------
 def crossValidationPlot(fileName):
     """
     perform a 10-fold cross validation on the specified file with both naive bayes
     and TAN algorithms, and output model accuracy 
     """
+    #process input file
+    data, atr = importarff(fileName)
+    Folds = []        #init empty fold set
+    foldIDs = []
+   
+    #make lists of positive and negative instance ID's
+    posIDs = [] ; negIDs = []
+    for ID,instance in enumerate(data):
+        if instance[-1] == 0:   #negative
+           negIDs.append(ID)
+        elif instance[-1] == 1: #pos
+            posIDs.append(ID)
     
+    #state information
+    nInstances = len(data)
+    nFolds = 10
+    #make n fold groups, each are np.arrays
+    instancesPerGroup = nInstances / nFolds  
+    
+    #separate instances into groups
+    for grp in range(nFolds):
+        #determine sampling numbers for this group
+        posPercent = len(posIDs)/float(nInstances)
+        nInstances = intSelect(instancesPerGroup)
+        nPos       = intSelect(nInstances * posPercent)
+        nNeg       = intSelect(nInstances * (1-posPercent))
+        
+        #put together a list of what samples are in this group
+        groupSamples = []
+        while nPos > 0 and len(posIDs) > 0: #add positives to group:
+            popID = np.random.randint(0,len(posIDs))
+            sampleID = posIDs.pop(popID)
+            groupSamples.append(sampleID)
+            nPos -= 1
+        while nNeg > 0 and len(negIDs) > 0: #add negatives to group:
+            popID = np.random.randint(0,len(negIDs))
+            sampleID = negIDs.pop(popID)
+            groupSamples.append(sampleID)
+            nNeg -= 1
+        
+        #perform sampling from self.data
+        group = np.zeros([len(groupSamples),data.shape[1]])
+        for newID,sampleID in enumerate(groupSamples):
+            group[newID,:] = data[sampleID,:]
+            
+            
+        #add group to folds, instance ID's to fold ID's 
+        Folds.append(group)
+        foldIDs.append(groupSamples)
+    
+    #perform the cross validation:
+    results = np.zeros([nFolds,2])
+    for fID, fold in enumerate(Folds):
+        folds = Folds[:] #make a shallow copy
+        testSet = folds.pop(fID)
+        trainingSet = merge(folds)
+        #train learners
+        nb = NaiveBayes(fileName,trainingSet)
+        tan = TAN(fileName,trainingSet)
+        #store results
+        results[fID,0] =  nb.cvTest(testSet)
+        results[fID,1] = tan.cvTest(testSet)
+        print('Fold ' + str(fID))
+    
+    return results
+        
+
+def flatten(nestedList):
+    """
+    method for flattening nested lists
+    """
+    flattenedList = []
+    for sublist in nestedList:
+        for val in sublist:
+            flattenedList.append(val)
+    return flattenedList
+
+def randBin(prob):
+    """
+    returns 1 or 0 randomly with probabilty prob
+    """
+    switch = np.random.uniform(0,1)
+    if switch <= prob:
+        return 1
+    else:
+        return 0
+    
+def intSelect(decimal):
+    """
+    rounds a decimal into an integer with probability corresponding to it's decimal. 
+    for instance:
+        7.95 would have a 95 percent chance of becoming 8 
+        6.07 would have a 93 percent chance of becoming 6
+    """
+    integer = int(decimal) ; dec = decimal - integer
+    return integer + randBin(dec)
+    
+def merge(foldList):
+    """
+    input: list of np.arrays
+    output: a single np array with all of the contents of the arrays stacked 
+    ontop of one another
+    """
+    allFolds = np.array([]).reshape(0,foldList[0].shape[1])  #get into the right shape!!
+    for fold in foldList:
+        allFolds = np.vstack((allFolds,fold))
+    return allFolds
+
+      
+      
 #---------------------------- grading -----------------------------------------
 def grading(trainFile,testFile, learningMethod):
     """
@@ -594,10 +702,10 @@ def grading(trainFile,testFile, learningMethod):
         
     
 #---------------------------- debugging ---------------------------------------
-nb = NaiveBayes('vote_train.arff')
+#nb = NaiveBayes('vote_train.arff')
 #nb = NaiveBayes('lymph_train.arff')
 
-tan = TAN('vote_train.arff')
+#tan = TAN('vote_train.arff')
 #tan = TAN('lymph_train.arff')  
 #tan.P([(13,6)],[(0,2),(18,0)]) 
 
