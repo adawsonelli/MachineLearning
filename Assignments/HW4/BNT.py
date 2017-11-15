@@ -20,12 +20,12 @@ class NaiveBayes():
         inputs: fileName of training set data file
         """
         #handle instantiation with sub-array of data
-        if type(dataArray) != None:
+        if type(dataArray) == np.ndarray:
             self.data = dataArray
             garbage , self.atr = importarff(fileName)
         
         #handle fileName instantiation
-        if type(dataArray) == None:
+        if dataArray is None:
             self.data , self.atr = importarff(fileName)
         
         #process data  input file:
@@ -226,19 +226,21 @@ class TAN():
     """
     def __init__(self, fileName, dataArray = None):
         """
-        inputs:fileName of training set data
+        inputs:fileName of training set data or training data array
         """
         #handle instantiation with sub-array of data
-        if type(dataArray) != None:
+        if type(dataArray) == np.ndarray:
             self.data = dataArray
             garbage , self.atr = importarff(fileName)
         
         #handle fileName instantiation
-        if type(dataArray) == None:
+        if dataArray is None:
             self.data , self.atr = importarff(fileName)
-        
+            
+        self.Pdict = {}
         self.nb = NaiveBayes(fileName,dataArray)  #Naive bayes instance - composition
         self.root = self.primGrowTree()
+        
         
     def I(self, xi, xj):
         """
@@ -271,6 +273,12 @@ class TAN():
             x1 is feature ID , c1 is choice ID
             P([(x1,c0),(x7,c1)] ,[(YID,c0),(x4,c4)])
         """
+        #check if P has been calculated before, and if so, return it
+        name = self.Pname(X,Y)
+        if name in self.Pdict:
+            return self.Pdict[name]
+        
+        #calculate P and add it to dictionary
         #generate counts for num and den of probability
         num = 0 ; den = 0 
         for instance in self.data:
@@ -291,7 +299,26 @@ class TAN():
         for feature in X: xChoiceProducts = xChoiceProducts * len(self.atr['DC'][feature[0]])
         P = float(num + 1) / (den + xChoiceProducts)
         
+        #add P to Pdict - store smart state to avoid recalculation
+        self.Pdict[name] = P
+        
         return P
+    
+    def Pname(self,X,Y):
+        """
+        determines and returns a string name that is unique to a particular 
+        conditional probabily, defined by X and Y
+        """
+        name = ""
+        for feature in X: name = name + str(feature[0]) + str(feature[1])
+        name = name + "|"
+        for feature in Y: name = name + str(feature[0]) + str(feature[1])
+        
+        return name 
+        
+        
+        
+        
     
     def primGrowTree(self):
         """
@@ -325,8 +352,7 @@ class TAN():
                 #swap items:
                 nodeList[sortedID], nodeList[minID] = nodeList[minID], nodeList[sortedID]
             #return nodeList
-
-        
+  
         #form node for each feature, not including Class Label
         free = [] ; network = []
         for fID in range(self.nb.nAttributes):
@@ -706,7 +732,7 @@ def grading(trainFile,testFile, learningMethod):
 #nb = NaiveBayes('lymph_train.arff')
 
 #tan = TAN('vote_train.arff')
-#tan = TAN('lymph_train.arff')  
+tan = TAN('lymph_train.arff')  
 #tan.P([(13,6)],[(0,2),(18,0)]) 
 
 
