@@ -214,7 +214,7 @@ class NaiveBayes():
             CL, postProb = self.predictInstance(x)
             if CL == x[-1]: 
                 correct += 1
-        return float(correct) / testData.shape[1]
+        return float(correct) / testData.shape[0]
             
             
         
@@ -310,14 +310,10 @@ class TAN():
         conditional probabily, defined by X and Y
         """
         name = ""
-        for feature in X: name = name + str(feature[0]) + str(feature[1])
+        for feature in X: name = name + str(feature[0]) +  "," + str(feature[1]) +  "," 
         name = name + "|"
-        for feature in Y: name = name + str(feature[0]) + str(feature[1])
-        
+        for feature in Y: name = name + str(feature[0]) +  "," + str(feature[1]) +  "," 
         return name 
-        
-        
-        
         
     
     def primGrowTree(self):
@@ -497,7 +493,7 @@ class TAN():
             CL, postProb = self.predictInstance(x)
             if CL == x[-1]: 
                 correct += 1
-        return float(correct) / testData.shape[1]
+        return float(correct) / testData.shape[0]
             
               
         
@@ -624,12 +620,12 @@ def crossValidationPlot(fileName):
     instancesPerGroup = nInstances / nFolds  
     
     #separate instances into groups
+    posPercent = len(posIDs)/float(nInstances)
     for grp in range(nFolds):
         #determine sampling numbers for this group
-        posPercent = len(posIDs)/float(nInstances)
-        nInstances = intSelect(instancesPerGroup)
-        nPos       = intSelect(nInstances * posPercent)
-        nNeg       = intSelect(nInstances * (1-posPercent))
+        IPG = intSelect(instancesPerGroup)
+        nPos       = intSelect(IPG * posPercent)
+        nNeg       = intSelect(IPG * (1-posPercent))
         
         #put together a list of what samples are in this group
         groupSamples = []
@@ -732,8 +728,9 @@ def grading(trainFile,testFile, learningMethod):
 #nb = NaiveBayes('lymph_train.arff')
 
 #tan = TAN('vote_train.arff')
-tan = TAN('lymph_train.arff')  
-#tan.P([(13,6)],[(0,2),(18,0)]) 
-
+#tan = TAN('lymph_train.arff')  
+#tan.P([(13,6)],[(0,2),(18,0)])
+crossValidationPlot('chess-KingRookVKingPawn.arff')
+#crossValidationPlot('lymph_test.arff')
 
 
